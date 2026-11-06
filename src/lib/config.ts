@@ -18,7 +18,7 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GROQ_API_KEY: z.string().optional().default(''),
-  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+  GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8),
   STORAGE_DIR: z.string().default('./storage'),
   LOG_LEVEL: z.string().default('info'),
