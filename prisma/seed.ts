@@ -257,7 +257,8 @@ async function main() {
   for (let i = 0; i < 46 && i < statuses.length; i++) {
     const [text, category] = pool[i % pool.length]
     const status = statuses[i]
-    const [flatId] = pick(authors.filter(([id]) => !id.startsWith('T14')))
+    // the three sample flats keep exactly the complaints the brief lists, so they are never picked here
+    const [flatId] = pick(authors.filter(([id]) => !id.startsWith('T14') && !['T07-1203', 'T12-0408', 'T21-1601'].includes(id)))
     await make({
       flatId, text, category, status, ageHours: status === 'NEW' ? int(1, 10) : status === 'RESOLVED' ? int(30, 24 * 40) : int(4, 24 * 6),
       rating: status === 'RESOLVED' && rnd() < 0.6 ? int(3, 5) : undefined, reopened: status === 'REOPENED' ? 1 : 0, overdue: status === 'NEW' && i % 3 === 0,
