@@ -217,6 +217,7 @@ export const en = {
     noNotices: 'No notices',
   },
   guard: {
+    privacyNotice: 'Notice: visitor photos and phone numbers are collected for township security and deleted after 90 days (DPDP Act 2023).',
     gateHome: 'Gate',
     newVisitor: 'New visitor',
     preapproved: 'Pre-approved code',

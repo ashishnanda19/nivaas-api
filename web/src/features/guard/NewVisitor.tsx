@@ -11,6 +11,7 @@ import { useOnline } from '@/lib/hooks'
 import { Button, Input } from '@/components/ui'
 import { CameraCapture } from '@/components/CameraCapture'
 import { useGate } from './useGate'
+import { GateNotice } from './GateNotice'
 
 const PURPOSES = ['delivery', 'guest', 'cab', 'service', 'help'] as const
 const FLATS_KEY = 'nivaas.guard.flats'
@@ -208,6 +209,7 @@ export default function NewVisitor() {
 
       <div className="flex-1 space-y-5">
         {step === 0 && <CameraCapture value={photo} onChange={setPhoto} />}
+        {step === 0 && <GateNotice />}
         {step === 1 && (
           <div className="space-y-4">
             <Input

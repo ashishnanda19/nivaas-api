@@ -219,6 +219,7 @@ export const mr: Dict = {
     noNotices: 'सूचना नाहीत',
   },
   guard: {
+    privacyNotice: 'सूचना: अभ्यागतांचे फोटो आणि फोन नंबर टाउनशिपच्या सुरक्षेसाठी घेतले जातात आणि ९० दिवसांनी हटवले जातात (DPDP कायदा २०२३).',
     gateHome: 'गेट',
     newVisitor: 'नवा पाहुणा',
     preapproved: 'आधी मंजूर कोड',

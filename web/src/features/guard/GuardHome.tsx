@@ -7,6 +7,7 @@ import { useOnline } from '@/lib/hooks'
 import { useQueue } from '@/lib/guardQueue'
 import { Select } from '@/components/ui'
 import { useGate } from './useGate'
+import { GateNotice } from './GateNotice'
 
 export default function GuardHome() {
   const { t } = useTranslation()
@@ -67,6 +68,7 @@ export default function GuardHome() {
           {t('guard.preapproved')}
         </Link>
       </div>
+      <GateNotice />
     </div>
   )
 }
