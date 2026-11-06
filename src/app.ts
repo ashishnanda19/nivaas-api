@@ -40,6 +40,8 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: (origin, cb) => cb(null, !origin || config.corsOrigins.includes(origin)),
     credentials: true,
+    // The default allows only GET, HEAD and POST. Language changes (PATCH) and removing a family member (DELETE) need the rest.
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   })
   await app.register(cookie)
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' })

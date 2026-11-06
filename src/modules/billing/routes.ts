@@ -31,7 +31,8 @@ export async function billingRoutes(app: FastifyInstance) {
   })
 
   app.get('/billing/ledger', any, async (req) => {
-    const q = parse(flatQuery.and(pageQuery), req.query)
+    // strip, not passthrough: passthrough would keep page as the text "1" and clash with the number the pagination schema makes of it
+    const q = parse(flatQuery.strip().and(pageQuery), req.query)
     assertFlatAccess(req.user!, q.flatId)
     const r = await svc.ledgerFor(q.flatId, pageArgs(q))
     return { items: r.rows, page: q.page, pageSize: q.pageSize, total: r.total }

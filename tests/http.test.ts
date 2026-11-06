@@ -78,4 +78,24 @@ describe('over HTTP', () => {
     expect(res.status).toBe(400)
     expect(res.body.error.code).toBeTruthy()
   })
+
+  it('answers the browser preflight for every method the app uses, for an allowed origin only', async () => {
+    const allowed = [...(await import('../src/lib/config.js')).config.corsOrigins][0]
+    for (const method of ['POST', 'PATCH', 'DELETE']) {
+      const res = await api().options('/api/v1/auth/language').set('Origin', allowed).set('Access-Control-Request-Method', method).set('Access-Control-Request-Headers', 'content-type,authorization')
+      expect(res.status, method).toBe(204)
+      expect(res.headers['access-control-allow-methods']).toContain(method)
+      expect(res.headers['access-control-allow-origin']).toBe(allowed)
+    }
+    const evil = await api().options('/api/v1/auth/language').set('Origin', 'https://evil.example').set('Access-Control-Request-Method', 'PATCH')
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined()
+  })
+
+  it('serves the ledger with page parameters, as the web app asks for it', async () => {
+    const { token } = await signIn(PHONES.neeraj)
+    const res = await api().get('/api/v1/billing/ledger?flatId=T07-1203&page=1&pageSize=100').set('Authorization', `Bearer ${token}`).expect(200)
+    expect(res.body).toMatchObject({ page: 1, pageSize: 100 })
+    expect(Array.isArray(res.body.items)).toBe(true)
+    await api().get('/api/v1/billing/ledger?flatId=T07-1203&pageSize=500').set('Authorization', `Bearer ${token}`).expect(400)
+  })
 })
