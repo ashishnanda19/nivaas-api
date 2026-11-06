@@ -1,0 +1,485 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// All money columns are integer paise.
+
+enum Role {
+  RESIDENT
+  HELPDESK
+  COMMITTEE
+  GUARD
+  ADMIN
+}
+
+enum MemberRelation {
+  OWNER
+  FAMILY
+  TENANT
+}
+
+enum LedgerType {
+  BILL
+  PAYMENT
+  LATE_FEE
+  REVERSAL
+  ADJUSTMENT
+}
+
+enum BillStatus {
+  DUE
+  PARTIAL
+  PAID
+}
+
+enum PayMode {
+  UPI
+  CARD
+  NETBANKING
+  CHEQUE
+  TRANSFER
+}
+
+enum PaySource {
+  TEST_GATEWAY
+  BANK_CSV
+}
+
+enum PayStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum UploadStatus {
+  PARSED
+  FAILED
+}
+
+enum Confidence {
+  EXACT
+  LIKELY
+  UNCLEAR
+}
+
+enum RowState {
+  PENDING
+  POSTED
+  QUEUED
+  REJECTED
+}
+
+enum Category {
+  PLUMBING
+  ELECTRICAL
+  LIFT
+  SECURITY
+  HOUSEKEEPING
+  PARKING
+  NOISE
+  WATER_SUPPLY
+  GARDEN
+  OTHER
+}
+
+enum Urgency {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  REOPENED
+}
+
+enum VisitorStatus {
+  WAITING
+  APPROVED
+  DENIED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model Society {
+  id             String   @id @default(cuid())
+  name           String
+  ratePaisePerSqft Int     @default(650)
+  graceDays      Int      @default(5)
+  // FLAT or MONTHLY_INTEREST
+  lateFeeMode    String   @default("MONTHLY_INTEREST")
+  lateFeeFlatPaise Int    @default(0)
+  // basis points per month, 175 = 1.75 % per month, simple interest pro rata by day
+  lateFeeMonthlyBp Int    @default(175)
+  towers         Tower[]
+}
+
+model Tower {
+  id        String  @id @default(cuid())
+  societyId String
+  society   Society @relation(fields: [societyId], references: [id])
+  number    Int
+  flats     Flat[]
+
+  @@unique([societyId, number])
+}
+
+model Flat {
+  id        String  @id // human code, e.g. T07-1203
+  towerId   String
+  tower     Tower   @relation(fields: [towerId], references: [id])
+  towerNo   Int
+  number    String
+  areaSqft  Int
+  members   FlatMember[]
+  bills     Bill[]
+  ledger    LedgerEntry[]
+  payments  Payment[]
+  complaints Complaint[]
+  visitors  Visitor[]
+  preApprovals PreApproval[]
+  bookings  AmenityBooking[]
+  knownPayers KnownPayer[]
+
+  @@unique([towerNo, number])
+  @@index([towerNo])
+}
+
+model User {
+  id         String   @id @default(cuid())
+  phone      String   @unique
+  name       String
+  role       Role
+  title      String?
+  language   String   @default("en")
+  consentAt  DateTime?
+  createdAt  DateTime @default(now())
+  members    FlatMember[]
+  refreshTokens RefreshToken[]
+}
+
+model FlatMember {
+  id       String         @id @default(cuid())
+  userId   String
+  user     User           @relation(fields: [userId], references: [id])
+  flatId   String
+  flat     Flat           @relation(fields: [flatId], references: [id])
+  relation MemberRelation
+  active   Boolean        @default(true)
+
+  @@unique([userId, flatId])
+  @@index([flatId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+}
+
+model Bill {
+  id        String     @id @default(cuid())
+  flatId    String
+  flat      Flat       @relation(fields: [flatId], references: [id])
+  period    String // YYYY-MM
+  areaSqft  Int
+  ratePaise Int
+  amountPaise Int
+  dueDate   DateTime
+  status    BillStatus @default(DUE)
+  lateFeePostedPaise Int @default(0)
+  createdAt DateTime   @default(now())
+
+  @@unique([flatId, period])
+  @@index([period])
+}
+
+model LedgerEntry {
+  id           String     @id @default(cuid())
+  seq          BigInt     @default(autoincrement())
+  flatId       String
+  flat         Flat       @relation(fields: [flatId], references: [id])
+  type         LedgerType
+  // signed: bills and late fees positive (owed), payments negative
+  amountPaise  Int
+  runningBalancePaise Int
+  ref          String
+  description  String
+  period       String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([flatId, ref])
+  @@index([flatId, seq])
+}
+
+model Payment {
+  id          String    @id @default(cuid())
+  flatId      String
+  flat        Flat      @relation(fields: [flatId], references: [id])
+  amountPaise Int
+  mode        PayMode
+  reference   String
+  upiId       String?
+  source      PaySource
+  status      PayStatus @default(PENDING)
+  idempotencyKey String? @unique
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+  receipt     Receipt?
+  statementRow BankStatementRow?
+
+  @@index([flatId])
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  number    String   @unique
+  paymentId String   @unique
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model BankStatementUpload {
+  id         String   @id @default(cuid())
+  filename   String
+  uploadedBy String
+  status     UploadStatus @default(PARSED)
+  parseErrors Json    @default("[]")
+  createdAt  DateTime @default(now())
+  rows       BankStatementRow[]
+}
+
+model BankStatementRow {
+  id          String   @id @default(cuid())
+  uploadId    String
+  upload      BankStatementUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  lineNo      Int
+  date        DateTime
+  amountPaise Int
+  narration   String
+  reference   String
+  upiId       String?
+  payerName   String?
+  suggestedFlatId String?
+  confidence  Confidence
+  label       String?
+  reasons     Json     @default("[]")
+  state       RowState @default(PENDING)
+  matchedFlatId String?
+  postedBy    String?
+  postedAt    DateTime?
+  paymentId   String?  @unique
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([uploadId])
+  @@index([reference])
+}
+
+model KnownPayer {
+  id       String @id @default(cuid())
+  flatId   String
+  flat     Flat   @relation(fields: [flatId], references: [id])
+  upiId    String?
+  payerName String?
+  createdAt DateTime @default(now())
+
+  @@unique([flatId, upiId])
+  @@index([upiId])
+}
+
+model Complaint {
+  id           String          @id @default(cuid())
+  code         String          @unique // C-1042
+  flatId       String
+  flat         Flat            @relation(fields: [flatId], references: [id])
+  towerNo      Int
+  authorId     String
+  text         String
+  photoPath    String?
+  category     Category
+  urgency      Urgency
+  aiCategory   Category
+  aiUrgency    Urgency
+  aiReason     String          @default("")
+  aiSource     String          @default("rules")
+  needsReview  Boolean         @default(false)
+  assigneeId   String?
+  status       ComplaintStatus @default(NEW)
+  responseDueAt DateTime
+  firstResponseAt DateTime?
+  overdueAt    DateTime?
+  escalated    Boolean         @default(false)
+  escalatedReason String?
+  rating       Int?
+  reopenedCount Int            @default(0)
+  resolvedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updates      ComplaintUpdate[]
+
+  @@index([flatId])
+  @@index([status])
+  @@index([towerNo, category, createdAt])
+}
+
+model ComplaintUpdate {
+  id          String    @id @default(cuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  authorId    String
+  authorName  String
+  staff       Boolean   @default(false)
+  kind        String    @default("comment") // comment | status | assign | category
+  text        String
+  createdAt   DateTime  @default(now())
+
+  @@index([complaintId])
+}
+
+model ComplaintLink {
+  id        String @id @default(cuid())
+  parentId  String
+  childId   String @unique
+  createdAt DateTime @default(now())
+
+  @@index([parentId])
+}
+
+model StaffMember {
+  id         String @id @default(cuid())
+  name       String
+  skills     Category[]
+  isDutyManager Boolean @default(false)
+  openLoad   Int @default(0)
+  userId     String? @unique
+}
+
+model Gate {
+  id   String @id
+  name String
+  visitors Visitor[]
+}
+
+model Visitor {
+  id          String        @id @default(cuid())
+  clientId    String?       @unique
+  gateId      String
+  gate        Gate          @relation(fields: [gateId], references: [id])
+  flatId      String
+  flat        Flat          @relation(fields: [flatId], references: [id])
+  name        String
+  phone       String
+  purpose     String
+  photoPath   String?
+  photoDeleteAfter DateTime?
+  status      VisitorStatus @default(WAITING)
+  source      String        @default("guard") // guard | code
+  createdOffline Boolean    @default(false)
+  createdBy   String
+  decidedAt   DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([flatId, createdAt])
+  @@index([photoDeleteAfter])
+}
+
+model PreApproval {
+  id        String   @id @default(cuid())
+  flatId    String
+  flat      Flat     @relation(fields: [flatId], references: [id])
+  guestName String
+  date      DateTime
+  codeHash  String   @unique
+  used      Boolean  @default(false)
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model Amenity {
+  id        String @id
+  name      String
+  rules     String[]
+  feePaise  Int
+  feeNote   String @default("")
+  slotMinutes Int
+  openFrom  String // HH:MM
+  openTo    String
+  bookings  AmenityBooking[]
+}
+
+model AmenityBooking {
+  id        String        @id @default(cuid())
+  amenityId String
+  amenity   Amenity       @relation(fields: [amenityId], references: [id])
+  flatId    String
+  flat      Flat          @relation(fields: [flatId], references: [id])
+  startsAt  DateTime
+  endsAt    DateTime
+  feePaise  Int
+  status    BookingStatus @default(CONFIRMED)
+  createdBy String
+  createdAt DateTime      @default(now())
+
+  @@index([amenityId, startsAt])
+  @@index([flatId])
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorName String
+  role      String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  detail    String   @default("")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([actorId])
+}
+
+model JobState {
+  name      String   @id
+  lastRunAt DateTime
+  lastError String?
+}
