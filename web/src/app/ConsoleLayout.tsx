@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import {
   BarChart3,
   CalendarDays,
+  BellRing,
   ClipboardList,
   Landmark,
   LogOut,
@@ -28,6 +29,7 @@ const ALL = [
   { to: '/console/billing', label: 'Billing', icon: Receipt, roles: ['helpdesk', 'committee'] },
   { to: '/console/visitors', label: 'Visitors', icon: Users, roles: ['helpdesk'] },
   { to: '/console/bookings', label: 'Amenity bookings', icon: CalendarDays, roles: ['helpdesk'] },
+  { to: '/console/reminders', label: 'Reminders', icon: BellRing, roles: ['helpdesk', 'committee'] },
   { to: '/console/audit', label: 'Audit log', icon: ClipboardList, roles: ['helpdesk', 'committee'] },
 ]
 

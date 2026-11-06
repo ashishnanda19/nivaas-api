@@ -38,6 +38,8 @@ import type {
   TimelineStep,
   Visitor,
   Notice,
+  ReminderLog,
+  ReminderRun,
 } from './types'
 
 const KEY = 'nivaas.db.v1'
@@ -731,6 +733,18 @@ export const mockApi = {
   async publishedRuns() {
     return load().billRuns
   },
+  async listReminders(): Promise<ReminderLog[]> {
+    await latency(true)
+    const at = (d: number) => new Date(Date.now() - d * 3600_000).toISOString()
+    return [
+      { id: 'r1', flatId: 'T12-0408', period: '2026-09', kind: 'OVERDUE', language: 'en', phone: '98******02', message: 'Hello Swati, the maintenance bill for September 2026 for flat T12-0408 is 47 days overdue (₹6,545 including late fee). Please pay in the Nivaas app or contact the help desk.', status: 'SENT', at: at(2) },
+      { id: 'r2', flatId: 'T21-1601', period: '2026-10', kind: 'OVERDUE', language: 'mr', phone: '98******03', message: 'नमस्कार Aamir, फ्लॅट T21-1601 चे October 2026 चे देखभाल शुल्क 18 दिवस थकले आहे (उशीर शुल्कासह ₹5,719). कृपया Nivaas ॲपमध्ये भरा किंवा हेल्प डेस्कशी संपर्क साधा.', status: 'SENT', at: at(2) },
+    ]
+  },
+  async runReminders(): Promise<ReminderRun> {
+    await latency(true)
+    return { checked: 2, sent: 0, failed: 0, skipped: 2 }
+  },
   async listAudit() {
     await latency(true)
     return load().audit
@@ -781,6 +795,7 @@ export const mockApi = {
       avgResponseH: 2.6,
       avgResolutionH: 19.5,
       reopenedPct: 11,
+      matching: { rows: 64, oneClickPct: 62.5, avgMinutesToPost: 6.4 },
     }
   },
 }

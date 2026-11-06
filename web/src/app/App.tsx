@@ -27,6 +27,7 @@ const Billing = lazy(() => import('@/features/helpdesk/Billing'))
 const VisitorsLog = lazy(() => import('@/features/helpdesk/VisitorsLog'))
 const Bookings = lazy(() => import('@/features/helpdesk/Bookings'))
 const AuditLog = lazy(() => import('@/features/helpdesk/AuditLog'))
+const Reminders = lazy(() => import('@/features/helpdesk/Reminders'))
 const Dashboard = lazy(() => import('@/features/committee/Dashboard'))
 const GuardHome = lazy(() => import('@/features/guard/GuardHome'))
 const NewVisitor = lazy(() => import('@/features/guard/NewVisitor'))
@@ -129,6 +130,7 @@ export function App() {
                 </RequireRole>
               }
             />
+            <Route path="reminders" element={<Reminders />} />
             <Route path="audit" element={<AuditLog />} />
             <Route path="dashboard" element={<Dashboard />} />
           </Route>

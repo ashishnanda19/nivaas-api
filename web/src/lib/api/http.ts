@@ -24,6 +24,8 @@ import type {
   Urgency,
   User,
   Visitor,
+  ReminderLog,
+  ReminderRun,
 } from './types'
 import type { MatchKind, MatchRow } from '../matching'
 
@@ -925,6 +927,13 @@ export const httpApi: Api = {
   async publishedRuns() {
     return (await call<{ items: { label: string }[] }>('/billing/runs')).items.map((r) => r.label)
   },
+  async listReminders(): Promise<ReminderLog[]> {
+    const r = await call<{ items: (Omit<ReminderLog, 'at'> & { sentAt: string })[] }>('/reminders?pageSize=100')
+    return r.items.map(({ sentAt, ...x }) => ({ ...x, at: sentAt }))
+  },
+  async runReminders(): Promise<ReminderRun> {
+    return call<ReminderRun>('/reminders/run', { method: 'POST' })
+  },
   async listAudit() {
     const r = await call<{
       items: {
@@ -963,6 +972,7 @@ export const httpApi: Api = {
         avgResolutionHours: number
         reopenedPct: number
       }
+      matching: { rows: number; oneClickPct: number; avgMinutesToPost: number | null }
     }>(`/committee/dashboard?months=${opts.months}${opts.tower === 'all' ? '' : `&tower=${opts.tower}`}`)
     return {
       months: d.months.map((m) => ({
@@ -984,6 +994,7 @@ export const httpApi: Api = {
       avgResponseH: d.complaints.avgResponseHours,
       avgResolutionH: d.complaints.avgResolutionHours,
       reopenedPct: Math.round(d.complaints.reopenedPct),
+      matching: d.matching,
     }
   },
 }
