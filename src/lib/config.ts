@@ -23,6 +23,8 @@ const schema = z.object({
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8),
   STORAGE_DIR: z.string().default('./storage'),
+  // local: files on disk. db: files in Postgres (survives restarts on hosts with no persistent disk). An S3_BUCKET, if set, wins over both.
+  STORAGE_DRIVER: z.enum(['local', 'db']).default('local'),
   // S3-compatible object storage (Supabase Storage, Cloudflare R2, AWS S3, MinIO). Leave S3_BUCKET empty to use local disk.
   S3_BUCKET: z.string().optional().default(''),
   S3_ENDPOINT: z.string().optional().default(''),

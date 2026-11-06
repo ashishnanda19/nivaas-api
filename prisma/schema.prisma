@@ -485,3 +485,10 @@ model JobState {
   lastRunAt DateTime
   lastError String?
 }
+
+/// Uploaded files kept in the database when STORAGE_DRIVER=db (hosts without a persistent disk).
+model StoredFile {
+  key       String   @id
+  data      Bytes
+  createdAt DateTime @default(now())
+}

@@ -1,6 +1,7 @@
 import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3'
 import { describe, expect, it } from 'vitest'
-import { createStorage, S3Storage } from '../src/lib/storage.js'
+import { prisma } from '../src/lib/db.js'
+import { createStorage, DbStorage, S3Storage } from '../src/lib/storage.js'
 import { PNG } from './helpers.js'
 
 // Runs against any S3-compatible server. Locally: docker run -p 9000:9000 minio/minio server /data
@@ -38,9 +39,28 @@ describe.skipIf(!endpoint)('S3Storage', () => {
 })
 
 describe('createStorage', () => {
-  const base = { STORAGE_DIR: './storage', S3_BUCKET: '', S3_ENDPOINT: '', S3_REGION: 'us-east-1', S3_ACCESS_KEY_ID: '', S3_SECRET_ACCESS_KEY: '', S3_FORCE_PATH_STYLE: false }
+  const base = { STORAGE_DRIVER: 'local' as const, STORAGE_DIR: './storage', S3_BUCKET: '', S3_ENDPOINT: '', S3_REGION: 'us-east-1', S3_ACCESS_KEY_ID: '', S3_SECRET_ACCESS_KEY: '', S3_FORCE_PATH_STYLE: false }
   it('uses local disk unless a bucket is configured', () => {
     expect(createStorage(base).constructor.name).toBe('LocalStorage')
+    expect(createStorage({ ...base, STORAGE_DRIVER: 'db' }).constructor.name).toBe('DbStorage')
     expect(createStorage({ ...base, S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' }).constructor.name).toBe('S3Storage')
+  })
+})
+
+describe('DbStorage', () => {
+  it('stores, reads back and deletes a file in Postgres', async () => {
+    const s = new DbStorage()
+    const key = await s.put('complaints', PNG, 'png')
+    expect(key).toMatch(/^complaints\/[a-f0-9-]{36}\.png$/)
+    expect((await s.get(key))!.equals(PNG)).toBe(true)
+    expect(await prisma.storedFile.count({ where: { key } })).toBe(1)
+    await s.delete(key)
+    expect(await s.get(key)).toBeNull()
+  })
+  it('returns null for a missing key, deletes quietly, and refuses keys it did not issue', async () => {
+    const s = new DbStorage()
+    expect(await s.get('visitors/00000000-0000-0000-0000-000000000000.png')).toBeNull()
+    await s.delete('visitors/00000000-0000-0000-0000-000000000000.png')
+    await expect(s.get('../etc/passwd')).rejects.toThrow()
   })
 })

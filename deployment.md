@@ -76,8 +76,12 @@ Re-run `npm audit` before each release.
 
 ## File storage
 
-Complaint and visitor photos go through a storage interface. With no `S3_BUCKET` they are written to `STORAGE_DIR` on local disk, which is lost on restart on hosts without a persistent disk (Render free plan). Set the `S3_*` variables to use any S3-compatible bucket instead; the bucket must be private, because the API serves photos itself through short-lived signed links.
+Complaint and visitor photos go through a storage interface with three drivers, chosen by environment variables:
 
-Supabase Storage: create a private bucket (Storage, New bucket), then Storage, S3 Connection, to find the endpoint and region and to create an access key. Use `S3_FORCE_PATH_STYLE=true`.
+| Driver | Set | Use |
+| --- | --- | --- |
+| Local disk | nothing (default), `STORAGE_DIR` | Development and any host with a persistent disk |
+| Postgres | `STORAGE_DRIVER=db` | Hosts with no persistent disk, such as the Render free plan. Files are rows in the `StoredFile` table. Photos are capped at about 1.8 MB and deleted after 90 days, so the free database is plenty |
+| S3-compatible bucket | `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | Supabase Storage, Backblaze B2, Cloudflare R2, AWS S3. Wins over the other two when `S3_BUCKET` is set. Keep the bucket private |
 
-`tests/storage.s3.test.ts` runs against any S3-compatible server when `S3_TEST_ENDPOINT` is set (it is skipped otherwise).
+In every case the API serves photos itself through short-lived signed links, so the store is never public. `tests/storage.s3.test.ts` covers the Postgres driver always, and the S3 driver against any S3-compatible server when `S3_TEST_ENDPOINT` is set.

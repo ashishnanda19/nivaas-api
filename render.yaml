@@ -12,7 +12,8 @@ services:
       # The seeded demo accounts accept the fixed code 123456. Every other number gets a random code.
       - { key: DEMO_OTP_PHONES, value: '9800000001,9800000002,9800000003,9800000004,9800000010,9800000020,9800000030' }
       - { key: STORAGE_DIR, value: /data/storage }
-      # Object storage keeps photos across restarts. The free plan has no persistent disk.
+      # The free plan has no persistent disk, so photos are kept in Postgres. Set S3_* instead to use a bucket.
+      - { key: STORAGE_DRIVER, value: db }
       - { key: S3_BUCKET, sync: false }
       - { key: S3_ENDPOINT, sync: false }
       - { key: S3_REGION, sync: false }

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { config } from './config.js'
+import { prisma } from './db.js'
 import { badRequest } from './errors.js'
 
 /** Where uploaded files live. Swap the implementation for S3-compatible storage later without touching callers. */
@@ -71,8 +72,28 @@ export class S3Storage implements Storage {
   }
 }
 
-export function createStorage(c: Pick<typeof config, 'STORAGE_DIR' | 'S3_BUCKET' | 'S3_ENDPOINT' | 'S3_REGION' | 'S3_ACCESS_KEY_ID' | 'S3_SECRET_ACCESS_KEY' | 'S3_FORCE_PATH_STYLE'>): Storage {
-  if (!c.S3_BUCKET) return new LocalStorage(c.STORAGE_DIR)
+/** Files as rows in Postgres. Same key shape as the other drivers; meant for small files such as photos capped at a couple of MB. */
+export class DbStorage implements Storage {
+  private check(key: string) {
+    if (!/^[a-z0-9_-]+\/[a-f0-9-]{36}\.[a-z0-9]+$/i.test(key)) throw badRequest('Bad file path')
+    return key
+  }
+  async put(folder: string, data: Buffer, ext: string) {
+    const key = `${folder.replace(/[^a-z0-9_-]/gi, '')}/${crypto.randomUUID()}.${ext.replace(/[^a-z0-9]/gi, '')}`
+    await prisma.storedFile.create({ data: { key, data: new Uint8Array(data) } })
+    return key
+  }
+  async get(key: string) {
+    const row = await prisma.storedFile.findUnique({ where: { key: this.check(key) } })
+    return row ? Buffer.from(row.data) : null
+  }
+  async delete(key: string) {
+    await prisma.storedFile.deleteMany({ where: { key: this.check(key) } })
+  }
+}
+
+export function createStorage(c: Pick<typeof config, 'STORAGE_DRIVER' | 'STORAGE_DIR' | 'S3_BUCKET' | 'S3_ENDPOINT' | 'S3_REGION' | 'S3_ACCESS_KEY_ID' | 'S3_SECRET_ACCESS_KEY' | 'S3_FORCE_PATH_STYLE'>): Storage {
+  if (!c.S3_BUCKET) return c.STORAGE_DRIVER === 'db' ? new DbStorage() : new LocalStorage(c.STORAGE_DIR)
   const client = new S3Client({
     region: c.S3_REGION,
     ...(c.S3_ENDPOINT ? { endpoint: c.S3_ENDPOINT } : {}),
