@@ -126,3 +126,22 @@ describe('report export', () => {
     expect((await get(`/committee/report.pdf?period=${period}`, swati)).statusCode).toBe(403)
   })
 })
+
+describe('tower filter and bill run list', () => {
+  it('narrows the dashboard to one tower', async () => {
+    const all = (await get('/committee/dashboard', committee)).json()
+    const t12 = (await get('/committee/dashboard?tower=12', committee)).json()
+    expect(all.outstandingPaise).toBe(637000 + 566000)
+    expect(t12.outstandingPaise).toBe(637000)
+    expect(t12.billedTotalPaise).toBe(637000)
+    expect(t12.topDefaultingTowers.map((t: { tower: string }) => t.tower)).toEqual(['T12'])
+    expect((await get('/committee/dashboard?tower=40', committee)).statusCode).toBe(400)
+  })
+
+  it('lists published bill runs for the help desk only', async () => {
+    const r = (await get('/billing/runs', hd)).json().items
+    expect(r.length).toBeGreaterThan(0)
+    expect(r[0]).toMatchObject({ bills: expect.any(Number), totalPaise: expect.any(Number), label: expect.any(String) })
+    expect((await get('/billing/runs', swati)).statusCode).toBe(403)
+  })
+})

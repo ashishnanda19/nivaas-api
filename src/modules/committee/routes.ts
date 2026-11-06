@@ -14,8 +14,8 @@ export async function committeeRoutes(app: FastifyInstance) {
   const period = z.object({ period: z.string().refine(periodOk, 'period must be YYYY-MM') })
 
   app.get('/committee/dashboard', g, async (req) => {
-    const { months } = parse(z.object({ months: z.coerce.number().int().min(1).max(12).default(6) }), req.query)
-    return svc.dashboard(months)
+    const q = parse(z.object({ months: z.coerce.number().int().min(1).max(12).default(6), tower: z.coerce.number().int().min(1).max(28).optional() }), req.query)
+    return svc.dashboard(q.months, new Date(), q.tower)
   })
 
   app.get('/committee/complaints', g, async () => svc.complaintMetrics())

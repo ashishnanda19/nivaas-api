@@ -35,6 +35,8 @@ export async function billingRoutes(app: FastifyInstance) {
     return { items: r.rows, page: q.page, pageSize: q.pageSize, total: r.total }
   })
 
+  app.get('/billing/runs', ops, async () => ({ items: await svc.listBillRuns() }))
+
   app.get('/billing/runs/preview', ops, async (req) => {
     const { period } = parse(z.object({ period: periodStr }), req.query)
     return svc.billRunPreview(period)

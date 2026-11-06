@@ -4,9 +4,11 @@ import { allocate } from '../billing/ledger.js'
 import { periodOk } from '../billing/service.js'
 import { ageing, avg, daysBetween, hoursBetween, monthLabel, onTimeRate, periodsBack } from './metrics.js'
 
+const towerPrefix = (n: number) => `T${String(n).padStart(2, '0')}-`
+
 /** Every unpaid bill with what is still owed on it and how late it is. */
-async function openBills(now: Date) {
-  const bills = await prisma.bill.findMany({ where: { status: { not: 'PAID' } }, select: { flatId: true, period: true, dueDate: true } })
+async function openBills(now: Date, tower?: number) {
+  const bills = await prisma.bill.findMany({ where: { status: { not: 'PAID' }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, period: true, dueDate: true } })
   const flatIds = [...new Set(bills.map((b) => b.flatId))]
   const ledger = await prisma.ledgerEntry.findMany({ where: { flatId: { in: flatIds } }, orderBy: [{ flatId: 'asc' }, { seq: 'asc' }], select: { flatId: true, type: true, amountPaise: true, ref: true, period: true } })
   const byFlat = new Map<string, typeof ledger>()
@@ -20,16 +22,16 @@ async function openBills(now: Date) {
   return rows
 }
 
-export async function dashboard(monthsBack = 6, now = new Date()) {
+export async function dashboard(monthsBack = 6, now = new Date(), tower?: number) {
   const periods = periodsBack(monthsBack, now)
   const from = new Date(`${periods[0]}-01T00:00:00Z`)
 
   const [billed, collectedRows, windowBills, windowPays, open, flatCounts] = await Promise.all([
-    prisma.bill.groupBy({ by: ['period'], where: { period: { in: periods } }, _sum: { amountPaise: true } }),
-    prisma.$queryRaw<{ m: string; s: bigint }[]>`SELECT to_char("paidAt", 'YYYY-MM') AS m, SUM("amountPaise") AS s FROM "Payment" WHERE status = 'SUCCESS' AND "paidAt" >= ${from} GROUP BY 1`,
-    prisma.bill.findMany({ where: { period: { in: periods } }, select: { flatId: true, dueDate: true, amountPaise: true } }),
-    prisma.payment.findMany({ where: { status: 'SUCCESS', paidAt: { not: null } }, select: { flatId: true, paidAt: true, amountPaise: true } }),
-    openBills(now),
+    prisma.bill.groupBy({ by: ['period'], where: { period: { in: periods }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, _sum: { amountPaise: true } }),
+    prisma.$queryRaw<{ m: string; s: bigint }[]>`SELECT to_char("paidAt", 'YYYY-MM') AS m, SUM("amountPaise") AS s FROM "Payment" WHERE status = 'SUCCESS' AND "paidAt" >= ${from} AND "flatId" LIKE ${tower ? towerPrefix(tower) + '%' : '%'} GROUP BY 1`,
+    prisma.bill.findMany({ where: { period: { in: periods }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, dueDate: true, amountPaise: true } }),
+    prisma.payment.findMany({ where: { status: 'SUCCESS', paidAt: { not: null }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, paidAt: true, amountPaise: true } }),
+    openBills(now, tower),
     prisma.flat.groupBy({ by: ['towerNo'], _count: true }),
   ])
   const billedBy = new Map(billed.map((b) => [b.period, b._sum.amountPaise ?? 0]))
@@ -61,16 +63,17 @@ export async function dashboard(monthsBack = 6, now = new Date()) {
     ageing: ageing(open),
     outstandingPaise: open.reduce((s, r) => s + r.remainingPaise, 0),
     topDefaultingTowers: topTowers,
-    complaints: await complaintMetrics(now),
+    complaints: await complaintMetrics(now, undefined, tower),
   }
 }
 
-export async function complaintMetrics(now = new Date(), since = new Date(now.getTime() - 90 * 86400000)) {
+export async function complaintMetrics(now = new Date(), since = new Date(now.getTime() - 90 * 86400000), tower?: number) {
+  const tw = tower ? { towerNo: tower } : {}
   const [weekly, byCategory, rows, counts] = await Promise.all([
-    prisma.$queryRaw<{ w: Date; n: bigint }[]>`SELECT date_trunc('week', "createdAt") AS w, COUNT(*) AS n FROM "Complaint" WHERE "createdAt" >= ${new Date(now.getTime() - 8 * 7 * 86400000)} GROUP BY 1 ORDER BY 1`,
-    prisma.complaint.groupBy({ by: ['category'], where: { createdAt: { gte: since } }, _count: true }),
-    prisma.complaint.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, firstResponseAt: true, resolvedAt: true, reopenedCount: true, status: true } }),
-    prisma.complaint.groupBy({ by: ['status'], _count: true }),
+    prisma.$queryRaw<{ w: Date; n: bigint }[]>`SELECT date_trunc('week', "createdAt") AS w, COUNT(*) AS n FROM "Complaint" WHERE "createdAt" >= ${new Date(now.getTime() - 8 * 7 * 86400000)} AND (${tower ?? 0}::int = 0 OR "towerNo" = ${tower ?? 0}::int) GROUP BY 1 ORDER BY 1`,
+    prisma.complaint.groupBy({ by: ['category'], where: { createdAt: { gte: since }, ...tw }, _count: true }),
+    prisma.complaint.findMany({ where: { createdAt: { gte: since }, ...tw }, select: { createdAt: true, firstResponseAt: true, resolvedAt: true, reopenedCount: true, status: true } }),
+    prisma.complaint.groupBy({ by: ['status'], where: tw, _count: true }),
   ])
   const responded = rows.filter((r) => r.firstResponseAt)
   const resolved = rows.filter((r) => r.resolvedAt)
@@ -83,8 +86,8 @@ export async function complaintMetrics(now = new Date(), since = new Date(now.ge
     avgResolutionHours: avg(resolved.map((r) => hoursBetween(r.createdAt, r.resolvedAt!))),
     reopenedPct: everResolved.length ? Math.round((everResolved.filter((r) => r.reopenedCount > 0).length / everResolved.length) * 1000) / 10 : 0,
     open: counts.filter((c) => c.status !== 'RESOLVED').reduce((s, c) => s + c._count, 0),
-    overdue: await prisma.complaint.count({ where: { overdueAt: { not: null }, createdAt: { gte: since } } }),
-    escalated: await prisma.complaint.count({ where: { escalated: true, createdAt: { gte: since } } }),
+    overdue: await prisma.complaint.count({ where: { overdueAt: { not: null }, createdAt: { gte: since }, ...tw } }),
+    escalated: await prisma.complaint.count({ where: { escalated: true, createdAt: { gte: since }, ...tw } }),
   }
 }
 

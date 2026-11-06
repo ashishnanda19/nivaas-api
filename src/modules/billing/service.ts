@@ -78,6 +78,11 @@ export async function billRunPublish(period: string, actor: Actor) {
   return { period, created, skipped: flats.length - created, totalPaise: total }
 }
 
+export async function listBillRuns() {
+  const rows = await prisma.bill.groupBy({ by: ['period'], _count: true, _sum: { amountPaise: true }, orderBy: { period: 'desc' }, take: 24 })
+  return rows.map((r) => ({ period: r.period, label: periodLabel(r.period), bills: r._count, totalPaise: r._sum.amountPaise ?? 0 }))
+}
+
 export interface BillView {
   flatId: string
   period: string
