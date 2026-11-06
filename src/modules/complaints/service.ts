@@ -8,15 +8,55 @@ import { writeAudit, systemActor, type Actor } from '../audit/service.js'
 import { complaintRepo as repo, INCLUDE } from './repo.js'
 import { classifyComplaint, type Classification } from '../ai/classify.js'
 import { defaultClients, type LlmClient } from '../ai/llm.js'
+import { cosine, defaultEmbeddingClient, type EmbeddingClient } from '../ai/embed.js'
+import { redact } from '../ai/redact.js'
+import { logger } from '../../lib/logger.js'
 
 export const DEFAULT_SLA: Record<Urgency, number> = { CRITICAL: 15, HIGH: 120, NORMAL: 480, LOW: 1440 }
 export const DUPLICATE_WINDOW_MS = 48 * 3600 * 1000
 export const SIMILARITY_THRESHOLD = 0.34
+/**
+ * Cosine similarity at which two complaints are treated as the same incident. Chosen on the tuning half of eval/duplicates.json
+ * and checked on the held-out half (100% precision, 80% recall there). Set high on purpose: a missed duplicate costs an extra
+ * ticket, a wrong link hides a different problem under another one.
+ */
+export const EMBEDDING_THRESHOLD = 0.95
 
 let clientsOverride: LlmClient[] | null = null
 /** Tests inject fake model clients here. */
 export const setLlmClients = (c: LlmClient[] | null) => { clientsOverride = c }
 const clients = () => clientsOverride ?? defaultClients()
+
+let embedOverride: EmbeddingClient | null | undefined
+/** Tests inject a fake embedder here. null turns embeddings off. */
+export const setEmbeddingClient = (c: EmbeddingClient | null | undefined) => { embedOverride = c }
+const embedder = () => (embedOverride === undefined ? defaultEmbeddingClient() : embedOverride)
+
+/** The text goes through the same redaction as the model call, then to the embedder. A failure only means word overlap is used. */
+async function embedText(text: string, knownNames: string[]): Promise<{ vector: number[]; model: string } | null> {
+  const c = embedder()
+  if (!c) return null
+  try {
+    return { vector: await c.embed(redact(text, knownNames)), model: c.model }
+  } catch (e) {
+    logger.warn({ err: (e as Error).message }, 'embedding unavailable, using word overlap')
+    return null
+  }
+}
+
+export interface DuplicateSide { text: string; embedding?: number[] | null; embeddingModel?: string | null }
+/**
+ * Are these two complaints the same incident? When both have an embedding from the same model, meaning decides. Otherwise word
+ * overlap does, as before. Returns how it was decided and the score, or null when they are not duplicates.
+ */
+export function duplicateMatch(a: DuplicateSide, b: DuplicateSide): { method: 'meaning' | 'words'; score: number; margin: number } | null {
+  if (a.embedding?.length && b.embedding?.length && a.embeddingModel && a.embeddingModel === b.embeddingModel && a.embedding.length === b.embedding.length) {
+    const score = cosine(a.embedding, b.embedding)
+    return score >= EMBEDDING_THRESHOLD ? { method: 'meaning', score, margin: score - EMBEDDING_THRESHOLD } : null
+  }
+  const score = similarity(a.text, b.text)
+  return score >= SIMILARITY_THRESHOLD ? { method: 'words', score, margin: score - SIMILARITY_THRESHOLD } : null
+}
 
 export async function slaFor(db: Db, urgency: Urgency): Promise<number> {
   const soc = await db.society.findFirst({ select: { slaMinutes: true } })
@@ -54,7 +94,7 @@ async function pickAssignee(tx: Tx, category: Category, escalated: boolean) {
   return skilled[0] ?? (await tx.staffMember.findFirst({ where: { isDutyManager: false }, orderBy: [{ openLoad: 'asc' }, { id: 'asc' }] })) ?? null
 }
 
-async function findDuplicateParent(tx: Tx, c: { towerNo: number; category: Category; text: string; now: Date; excludeCode?: string }) {
+async function findDuplicateParent(tx: Tx, c: { towerNo: number; category: Category; text: string; now: Date; excludeCode?: string; embedding?: number[] | null; embeddingModel?: string | null }) {
   const since = new Date(c.now.getTime() - DUPLICATE_WINDOW_MS)
   const children = (await tx.complaintLink.findMany({ select: { childId: true } })).map((l) => l.childId)
   const open = await tx.complaint.findMany({
@@ -65,12 +105,12 @@ async function findDuplicateParent(tx: Tx, c: { towerNo: number; category: Categ
     orderBy: { createdAt: 'asc' },
     take: 50,
   })
-  let best: { c: Complaint; score: number } | null = null
+  let best: { c: Complaint; method: 'meaning' | 'words'; score: number; margin: number } | null = null
   for (const o of open) {
-    const score = similarity(o.text, c.text)
-    if (score >= SIMILARITY_THRESHOLD && (!best || score > best.score)) best = { c: o, score }
+    const m = duplicateMatch({ text: c.text, embedding: c.embedding, embeddingModel: c.embeddingModel }, o)
+    if (m && (!best || m.margin > best.margin)) best = { c: o, ...m }
   }
-  return best?.c ?? null
+  return best ? { parent: best.c, method: best.method, score: best.score } : null
 }
 
 export interface CreateInput {
@@ -84,7 +124,11 @@ export async function createComplaint(user: AuthUser, input: CreateInput, now = 
   const flat = await repo.flatWithMembers(input.flatId)
   if (!flat) throw notFound('Flat not found')
   const knownNames = flat.members.map((m) => m.user.name)
-  const ai: Classification = await classifyComplaint({ text: input.text, userId: user.id, knownNames }, clients())
+  // The model and the embedder are independent, so they run side by side and neither waits for the other.
+  const [ai, emb]: [Classification, { vector: number[]; model: string } | null] = await Promise.all([
+    classifyComplaint({ text: input.text, userId: user.id, knownNames }, clients()),
+    embedText(input.text, knownNames),
+  ])
 
   let photoKey: string | null = null
   if (input.photo) {
@@ -97,7 +141,7 @@ export async function createComplaint(user: AuthUser, input: CreateInput, now = 
   try {
     return await prisma.$transaction(async (tx) => {
       const staff = await pickAssignee(tx, category, ai.escalated)
-      const parent = ai.escalated ? null : await findDuplicateParent(tx, { towerNo: flat.towerNo, category, text: input.text, now })
+      const dup = ai.escalated ? null : await findDuplicateParent(tx, { towerNo: flat.towerNo, category, text: input.text, now, embedding: emb?.vector, embeddingModel: emb?.model })
       const code = await nextCode(tx)
       const c = await tx.complaint.create({
         data: {
@@ -105,6 +149,7 @@ export async function createComplaint(user: AuthUser, input: CreateInput, now = 
           category, urgency: ai.urgency, aiCategory: ai.category, aiUrgency: ai.urgency, aiReason: ai.reason, aiSource: ai.source,
           needsReview: ai.needsReview, assigneeId: staff?.id ?? null, status: staff ? 'ASSIGNED' : 'NEW',
           responseDueAt: new Date(now.getTime() + sla * 60_000), escalated: ai.escalated, escalatedReason: ai.escalatedReason,
+          embedding: emb?.vector ?? [], embeddingModel: emb?.model ?? null,
         },
       })
       await tx.complaintUpdate.create({ data: { complaintId: c.id, authorId: user.id, authorName: user.name, kind: 'status', text: 'raised' } })
@@ -112,7 +157,7 @@ export async function createComplaint(user: AuthUser, input: CreateInput, now = 
         await tx.staffMember.update({ where: { id: staff.id }, data: { openLoad: { increment: 1 } } })
         await tx.complaintUpdate.create({ data: { complaintId: c.id, authorId: 'system', authorName: 'System', kind: 'status', text: 'assigned' } })
       }
-      if (parent) await tx.complaintLink.create({ data: { parentId: parent.id, childId: c.id } })
+      if (dup) await tx.complaintLink.create({ data: { parentId: dup.parent.id, childId: c.id, method: dup.method, score: Math.round(dup.score * 1000) / 1000 } })
       if (ai.escalated) {
         await writeAudit(tx, systemActor, {
           action: 'complaint.escalate', entity: 'Complaint', entityId: c.code,
@@ -319,7 +364,7 @@ export async function link(user: AuthUser, actor: Actor, code: string, parentCod
   const hasKids = await repo.countChildren(child.id)
   if (hasKids) throw conflict('This complaint already has duplicates linked under it')
   await prisma.$transaction(async (tx) => {
-    await tx.complaintLink.upsert({ where: { childId: child.id }, update: { parentId: parent.id }, create: { parentId: parent.id, childId: child.id } })
+    await tx.complaintLink.upsert({ where: { childId: child.id }, update: { parentId: parent.id, method: 'manual', score: null }, create: { parentId: parent.id, childId: child.id, method: 'manual' } })
     await writeAudit(tx, actor, { action: 'complaint.link', entity: 'Complaint', entityId: code, after: { parent: parentCode }, detail: 'Linked as duplicate. Nothing was closed.' })
   })
   return getComplaint(user, code)

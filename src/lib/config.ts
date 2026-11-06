@@ -29,6 +29,7 @@ const schema = z.object({
   SMS_ALLOW_ALL: bool,
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash-lite'),
+  GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
   GROQ_API_KEY: z.string().optional().default(''),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8),

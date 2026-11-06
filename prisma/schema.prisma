@@ -350,6 +350,9 @@ model Complaint {
   @@index([flatId])
   @@index([status])
   @@index([towerNo, category, createdAt])
+  /// Meaning of the text as a vector, used to link duplicates across wording and languages. Empty when no embedding was available.
+  embedding      Float[]  @default([])
+  embeddingModel String?
 }
 
 model ComplaintUpdate {
@@ -373,6 +376,9 @@ model ComplaintLink {
   createdAt DateTime @default(now())
 
   @@index([parentId])
+  /// How the link was found: words (word overlap), meaning (embeddings) or manual (help desk).
+  method String  @default("manual")
+  score  Float?
 }
 
 model StaffMember {
