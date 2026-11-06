@@ -34,6 +34,9 @@ describe('safety words win over the model', () => {
     ['hi fire', 'बेसमेंट में आग लगी है और धुआं फैल रहा है'],
     ['hi gas', 'रसोई के पास गैस की बदबू आ रही है'],
     ['hi lift', 'लिफ्ट में फंस गए हैं, मदद करें'],
+    ['hi lift people', 'लिफ्ट में दो लोग फंसे हुए हैं'],
+    ['hi lift roman', 'Lift mein bacche fas gaye hain'],
+    ['mr lift girl', 'लिफ्टमध्ये मुलगी अडकली आहे'],
     ['hi shock', 'स्विच बोर्ड से बिजली का झटका लगा'],
     ['hi shock loanword', 'बिजली का शॉक लग रहा है स्विच बोर्ड से'],
     ['hi shock child', 'बच्चे को स्विच से शॉक लगा'],
@@ -79,7 +82,7 @@ describe('safety words win over the model', () => {
   })
 
   it('does not escalate ordinary complaints', async () => {
-    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है', 'लिफ्ट बंद है', 'Lift not working in tower 14, display shows the wrong floor', 'Fixed asset register needs updating', 'The new maintenance rates are shocking', 'Shock absorber of the main gate is broken', 'शोक सभा की सूचना लगाएं', 'लिफ्ट में झटके लगते हैं'])
+    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है', 'लिफ्ट बंद है', 'Lift not working in tower 14, display shows the wrong floor', 'Fixed asset register needs updating', 'The new maintenance rates are shocking', 'Shock absorber of the main gate is broken', 'शोक सभा की सूचना लगाएं', 'लिफ्ट में झटके लगते हैं', 'लिफ्ट में दो दिन से आवाज आ रही है', 'Lift mein bahut bheed rehti hai'])
       expect(detectSafety(t)).toBeNull()
   })
 })

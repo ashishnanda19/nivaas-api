@@ -22,8 +22,8 @@ const SAFETY: Record<SafetyKind, RegExp[]> = {
   ],
   lift_trapped: [
     /\b(stuck|trapped|struck|locked|stranded)\b.{0,25}\b(lift|elevator)\b|\b(lift|elevator)\b.{0,30}\b(stuck|trapped|struck|stopped between|fell|free ?fall|door won'?t open)\b/i,
-    /लिफ्ट\s*(में|मध्ये|मधे|मे)\s*(फंस|फँस|अडक|अटक)|लिफ्ट\s*(अटक|अडक|रुक)|(फंस|फँस|अडक)\w*\s*लिफ्ट/,
-    /\blift\s*(mein|me|madhe)\s*(fas|fass|adak|atak)/i,
+    /लिफ्ट\s*(में|मध्ये|मधे|मे)\s+(?:\S+\s+){0,3}?(फंस|फँस|अडक|अटक)|लिफ्ट\s*(अटक|अडक|रुक)|(फंस|फँस|अडक)\w*\s*लिफ्ट|लिफ्टमध्ये\s+(?:\S+\s+){0,3}?(अडक|अटक)|लिफ्टमध्ये\s*(अडक|अटक)|लिफ्ट\s*(में|मे)\s*(फंस|फँस)/,
+    /\blift\s*(mein|me|madhe)\s+(?:\w+\s+){0,3}?(fas|fass|adak|atak)/i,
   ],
   electric: [
     /\b(electric(al)?\s*shock|electrocut\w*|got\s*a\s*shock|short[\s-]*circuit|sparking|sparks?|live wire|wire\s*(fell|hanging)|current\s*(in|leak)\w*)\b/i,
