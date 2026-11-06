@@ -1,0 +1,92 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource/noto-sans-devanagari/400.css';
+@import '@fontsource/noto-sans-devanagari/500.css';
+@import '@fontsource/noto-sans-devanagari/600.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 255 255 255;
+  --surface: 255 255 255;
+  --sunken: 248 250 252;
+  --line: 226 232 240;
+  --line-strong: 203 213 225;
+  --fg: 15 23 42;
+  --muted: 100 116 139;
+  --accent: 79 70 229;
+  --accent-hover: 67 56 202;
+  --accent-tint: 238 242 255;
+  --accent-ink: 67 56 202;
+  --success: 21 128 61;
+  --success-tint: 240 253 244;
+  --warning: 180 83 9;
+  --warning-tint: 255 251 235;
+  --danger: 185 28 28;
+  --danger-tint: 254 242 242;
+  color-scheme: light;
+}
+.dark {
+  --bg: 8 11 20;
+  --surface: 15 21 35;
+  --sunken: 3 6 14;
+  --line: 33 43 62;
+  --line-strong: 51 65 85;
+  --fg: 241 245 249;
+  --muted: 148 163 184;
+  --accent: 79 70 229;
+  --accent-hover: 99 102 241;
+  --accent-tint: 30 27 75;
+  --accent-ink: 165 180 252;
+  --success: 74 222 128;
+  --success-tint: 5 46 22;
+  --warning: 251 191 36;
+  --warning-tint: 69 26 3;
+  --danger: 252 129 129;
+  --danger-tint: 69 10 10;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
+  ::selection {
+    background: rgb(var(--accent) / 0.2);
+  }
+}
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--line-strong) / 0.35), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
