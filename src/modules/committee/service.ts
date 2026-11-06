@@ -1,16 +1,14 @@
-import { prisma } from '../../lib/db.js'
 import { badRequest } from '../../lib/errors.js'
 import { allocate } from '../billing/ledger.js'
 import { periodOk } from '../billing/service.js'
+import { committeeRepo as repo, towerPrefix } from './repo.js'
 import { ageing, avg, daysBetween, hoursBetween, monthLabel, onTimeRate, periodsBack } from './metrics.js'
-
-const towerPrefix = (n: number) => `T${String(n).padStart(2, '0')}-`
 
 /** Every unpaid bill with what is still owed on it and how late it is. */
 async function openBills(now: Date, tower?: number) {
-  const bills = await prisma.bill.findMany({ where: { status: { not: 'PAID' }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, period: true, dueDate: true } })
+  const bills = await repo.unpaidBills(tower)
   const flatIds = [...new Set(bills.map((b) => b.flatId))]
-  const ledger = await prisma.ledgerEntry.findMany({ where: { flatId: { in: flatIds } }, orderBy: [{ flatId: 'asc' }, { seq: 'asc' }], select: { flatId: true, type: true, amountPaise: true, ref: true, period: true } })
+  const ledger = await repo.ledgerForFlats(flatIds)
   const byFlat = new Map<string, typeof ledger>()
   for (const e of ledger) (byFlat.get(e.flatId) ?? byFlat.set(e.flatId, []).get(e.flatId)!).push(e)
   const dues = new Map(flatIds.map((f) => [f, allocate(byFlat.get(f) ?? [])]))
@@ -27,12 +25,12 @@ export async function dashboard(monthsBack = 6, now = new Date(), tower?: number
   const from = new Date(`${periods[0]}-01T00:00:00Z`)
 
   const [billed, collectedRows, windowBills, windowPays, open, flatCounts] = await Promise.all([
-    prisma.bill.groupBy({ by: ['period'], where: { period: { in: periods }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, _sum: { amountPaise: true } }),
-    prisma.$queryRaw<{ m: string; s: bigint }[]>`SELECT to_char("paidAt", 'YYYY-MM') AS m, SUM("amountPaise") AS s FROM "Payment" WHERE status = 'SUCCESS' AND "paidAt" >= ${from} AND "flatId" LIKE ${tower ? towerPrefix(tower) + '%' : '%'} GROUP BY 1`,
-    prisma.bill.findMany({ where: { period: { in: periods }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, dueDate: true, amountPaise: true } }),
-    prisma.payment.findMany({ where: { status: 'SUCCESS', paidAt: { not: null }, ...(tower ? { flatId: { startsWith: towerPrefix(tower) } } : {}) }, select: { flatId: true, paidAt: true, amountPaise: true } }),
+    repo.billedByPeriod(periods, tower),
+    repo.collectedByMonth(from, tower),
+    repo.billsInPeriods(periods, tower),
+    repo.successfulPayments(tower),
     openBills(now, tower),
-    prisma.flat.groupBy({ by: ['towerNo'], _count: true }),
+    repo.flatsPerTower(),
   ])
   const billedBy = new Map(billed.map((b) => [b.period, b._sum.amountPaise ?? 0]))
   const collectedBy = new Map(collectedRows.map((r) => [r.m, Number(r.s)]))
@@ -68,12 +66,11 @@ export async function dashboard(monthsBack = 6, now = new Date(), tower?: number
 }
 
 export async function complaintMetrics(now = new Date(), since = new Date(now.getTime() - 90 * 86400000), tower?: number) {
-  const tw = tower ? { towerNo: tower } : {}
   const [weekly, byCategory, rows, counts] = await Promise.all([
-    prisma.$queryRaw<{ w: Date; n: bigint }[]>`SELECT date_trunc('week', "createdAt") AS w, COUNT(*) AS n FROM "Complaint" WHERE "createdAt" >= ${new Date(now.getTime() - 8 * 7 * 86400000)} AND (${tower ?? 0}::int = 0 OR "towerNo" = ${tower ?? 0}::int) GROUP BY 1 ORDER BY 1`,
-    prisma.complaint.groupBy({ by: ['category'], where: { createdAt: { gte: since }, ...tw }, _count: true }),
-    prisma.complaint.findMany({ where: { createdAt: { gte: since }, ...tw }, select: { createdAt: true, firstResponseAt: true, resolvedAt: true, reopenedCount: true, status: true } }),
-    prisma.complaint.groupBy({ by: ['status'], where: tw, _count: true }),
+    repo.complaintsPerWeek(new Date(now.getTime() - 8 * 7 * 86400000), tower),
+    repo.complaintsByCategory(since, tower),
+    repo.complaintTimings(since, tower),
+    repo.complaintsByStatus(tower),
   ])
   const responded = rows.filter((r) => r.firstResponseAt)
   const resolved = rows.filter((r) => r.resolvedAt)
@@ -86,8 +83,8 @@ export async function complaintMetrics(now = new Date(), since = new Date(now.ge
     avgResolutionHours: avg(resolved.map((r) => hoursBetween(r.createdAt, r.resolvedAt!))),
     reopenedPct: everResolved.length ? Math.round((everResolved.filter((r) => r.reopenedCount > 0).length / everResolved.length) * 1000) / 10 : 0,
     open: counts.filter((c) => c.status !== 'RESOLVED').reduce((s, c) => s + c._count, 0),
-    overdue: await prisma.complaint.count({ where: { overdueAt: { not: null }, createdAt: { gte: since }, ...tw } }),
-    escalated: await prisma.complaint.count({ where: { escalated: true, createdAt: { gte: since }, ...tw } }),
+    overdue: await repo.countOverdue(since, tower),
+    escalated: await repo.countEscalated(since, tower),
   }
 }
 
@@ -96,12 +93,12 @@ export async function monthlyReport(period: string, now = new Date()) {
   const start = new Date(`${period}-01T00:00:00Z`)
   const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1))
   const [billed, paid, open, created, resolved, society] = await Promise.all([
-    prisma.bill.aggregate({ where: { period }, _sum: { amountPaise: true }, _count: true }),
-    prisma.payment.aggregate({ where: { status: 'SUCCESS', paidAt: { gte: start, lt: end } }, _sum: { amountPaise: true }, _count: true }),
+    repo.billTotals(period),
+    repo.paymentTotals(start, end),
     openBills(now),
-    prisma.complaint.findMany({ where: { createdAt: { gte: start, lt: end } }, select: { createdAt: true, firstResponseAt: true, category: true, escalated: true, reopenedCount: true } }),
-    prisma.complaint.findMany({ where: { resolvedAt: { gte: start, lt: end } }, select: { createdAt: true, resolvedAt: true } }),
-    prisma.society.findFirstOrThrow(),
+    repo.complaintsCreated(start, end),
+    repo.complaintsResolved(start, end),
+    repo.society(),
   ])
   const towers = new Map<number, number>()
   for (const r of open) towers.set(r.towerNo, (towers.get(r.towerNo) ?? 0) + r.remainingPaise)
