@@ -24,18 +24,23 @@ export class Scheduler {
   private redis?: Redis
   mode: 'redis' | 'in-process' | 'stopped' = 'stopped'
 
+  constructor(
+    private redisUrl: string = config.REDIS_URL,
+    private queueName = 'nivaas-jobs',
+  ) {}
+
   register(...defs: JobDef[]) {
     for (const d of defs) this.jobs.set(d.name, d)
   }
 
   async start() {
-    if (config.REDIS_URL) {
-      this.redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null })
-      this.queue = new Queue('nivaas-jobs', { connection: this.redis })
+    if (this.redisUrl) {
+      this.redis = new Redis(this.redisUrl, { maxRetriesPerRequest: null })
+      this.queue = new Queue(this.queueName, { connection: this.redis })
       for (const j of this.jobs.values())
         await this.queue.upsertJobScheduler(j.name, { every: j.everyMs }, { name: j.name })
       this.worker = new Worker(
-        'nivaas-jobs',
+        this.queueName,
         async (job) => {
           await this.jobs.get(job.name)?.run()
         },

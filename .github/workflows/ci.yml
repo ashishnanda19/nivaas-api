@@ -16,7 +16,11 @@ jobs:
         ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U nivaas" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
     env:
+      REDIS_TEST_URL: redis://localhost:6379
       DATABASE_URL: postgresql://nivaas:nivaas@localhost:5432/nivaas_test
       DATABASE_URL_TEST: postgresql://nivaas:nivaas@localhost:5432/nivaas_test
       JWT_SECRET: ci-secret-ci-secret-ci-secret
