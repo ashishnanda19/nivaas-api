@@ -8,6 +8,7 @@ import { maskPhone } from '../../lib/phone.js'
 import { requireImage, storage } from '../../lib/storage.js'
 import { writeAudit, systemActor, type Actor } from '../audit/service.js'
 import { PHOTO_DAYS } from './schema.js'
+import { visitorRepo as repo } from './repo.js'
 
 const DAY = 86400000
 export const MAX_OFFLINE_AGE_MS = 7 * DAY
@@ -45,10 +46,10 @@ export const view = (v: Visitor, viewer: AuthUser, reveal = false) => {
 export async function createEntry(guard: AuthUser, e: EntryInput, opts: { offline?: boolean; now?: Date } = {}): Promise<{ visitor: Visitor; created: boolean }> {
   const now = opts.now ?? new Date()
   if (e.clientId) {
-    const existing = await prisma.visitor.findUnique({ where: { clientId: e.clientId } })
+    const existing = await repo.byClientId(e.clientId)
     if (existing) return { visitor: existing, created: false }
   }
-  const [flat, gate] = await Promise.all([prisma.flat.findUnique({ where: { id: e.flatId } }), prisma.gate.findUnique({ where: { id: e.gateId } })])
+  const [flat, gate] = await Promise.all([repo.flatExists(e.flatId), repo.gateById(e.gateId)])
   if (!flat) throw notFound(`Flat ${e.flatId} not found`)
   if (!gate) throw notFound(`Gate ${e.gateId} not found`)
 
@@ -65,19 +66,17 @@ export async function createEntry(guard: AuthUser, e: EntryInput, opts: { offlin
     photoPath = await storage.put('visitors', buf, requireImage(buf).ext)
   }
   try {
-    const visitor = await prisma.visitor.create({
-      data: {
-        clientId: e.clientId, gateId: e.gateId, flatId: e.flatId, name: e.name, phone: e.phone, purpose: e.purpose,
-        photoPath, photoDeleteAfter: photoPath ? new Date(createdAt.getTime() + PHOTO_DAYS * DAY) : null,
-        createdOffline: !!opts.offline, createdBy: guard.id, createdAt,
-      },
+    const visitor = await repo.create({
+      clientId: e.clientId, gateId: e.gateId, flatId: e.flatId, name: e.name, phone: e.phone, purpose: e.purpose,
+      photoPath, photoDeleteAfter: photoPath ? new Date(createdAt.getTime() + PHOTO_DAYS * DAY) : null,
+      createdOffline: !!opts.offline, createdBy: guard.id, createdAt,
     })
     return { visitor, created: true }
   } catch (err) {
     if (photoPath) await storage.delete(photoPath)
     // A concurrent request with the same clientId won the race.
     if (e.clientId && (err as { code?: string }).code === 'P2002') {
-      const winner = await prisma.visitor.findUnique({ where: { clientId: e.clientId } })
+      const winner = await repo.byClientId(e.clientId)
       if (winner) return { visitor: winner, created: false }
     }
     throw err
@@ -114,16 +113,13 @@ export async function listVisitors(user: AuthUser, actor: Actor, q: { flatId?: s
     ],
   }
   const reveal = q.reveal === 'true'
-  const [rows, total] = await Promise.all([
-    prisma.visitor.findMany({ where, orderBy: { createdAt: 'desc' }, skip: q.skip, take: q.take }),
-    prisma.visitor.count({ where }),
-  ])
+  const [rows, total] = await repo.page(where, q.skip, q.take)
   if (isOps(user) && reveal && rows.length) await writeAudit(prisma, actor, { action: 'pii.view', entity: 'Visitor', entityId: 'list', detail: `Viewed ${rows.length} visitor phone numbers` })
   return { total, items: rows.map((v) => view(v, user, reveal)) }
 }
 
 async function loadScoped(user: AuthUser, id: string) {
-  const v = await prisma.visitor.findFirst({ where: { AND: [{ id }, scope(user)] } })
+  const v = await repo.scopedById(id, scope(user))
   if (!v) throw notFound('Visitor not found')
   return v
 }
@@ -138,7 +134,7 @@ export async function decide(user: AuthUser, actor: Actor, id: string, decision:
   const v = await loadScoped(user, id)
   if (v.status === decision) return view(v, user)
   if (v.status !== 'WAITING') throw conflict(`This visitor is already ${v.status.toLowerCase().replace('_', ' ')}`)
-  const upd = await prisma.visitor.updateMany({ where: { id, status: 'WAITING' }, data: { status: decision, decidedAt: new Date() } })
+  const upd = await repo.transition(id, 'WAITING', { status: decision, decidedAt: new Date() })
   if (upd.count === 0) throw conflict('This visitor was already answered')
   await writeAudit(prisma, actor, { action: 'visitor.decision', entity: 'Visitor', entityId: id, before: { status: 'WAITING' }, after: { status: decision } })
   return getVisitor(user, id)
@@ -149,14 +145,14 @@ export async function gateStatus(user: AuthUser, actor: Actor, id: string, statu
   const v = await loadScoped(user, id)
   if (v.status === status) return view(v, user)
   if (NEXT[v.status] !== status) throw conflict(`A visitor who is ${v.status.toLowerCase().replace('_', ' ')} cannot be marked ${status.toLowerCase().replace('_', ' ')}`)
-  const upd = await prisma.visitor.updateMany({ where: { id, status: v.status }, data: { status } })
+  const upd = await repo.transition(id, v.status, { status })
   if (upd.count === 0) throw conflict('Visitor status changed, refresh and try again')
   await writeAudit(prisma, actor, { action: 'visitor.gate_status', entity: 'Visitor', entityId: id, before: { status: v.status }, after: { status } })
   return getVisitor(user, id)
 }
 
 export async function photoFor(id: string) {
-  const v = await prisma.visitor.findUnique({ where: { id }, select: { photoPath: true } })
+  const v = await repo.photoPathOf(id)
   if (!v?.photoPath) throw notFound('No photo')
   const buf = await storage.get(v.photoPath)
   if (!buf) throw notFound('No photo')
@@ -174,7 +170,7 @@ export async function createPreApproval(user: AuthUser, b: { flatId: string; gue
   for (let i = 0; i < 10; i++) {
     const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
     try {
-      const p = await prisma.preApproval.create({ data: { flatId: b.flatId, guestName: b.guestName, date: new Date(`${istDay(b.date)}T00:00:00.000Z`), codeHash: hashCode(code), createdBy: user.id } })
+      const p = await repo.createPreApproval({ flatId: b.flatId, guestName: b.guestName, date: new Date(`${istDay(b.date)}T00:00:00.000Z`), codeHash: hashCode(code), createdBy: user.id })
       // The plain code exists only in this response. Only its hash is stored.
       return { id: p.id, flatId: p.flatId, guestName: p.guestName, date: istDay(p.date), code, used: false }
     } catch (e) {
@@ -185,7 +181,7 @@ export async function createPreApproval(user: AuthUser, b: { flatId: string; gue
 }
 
 export async function listPreApprovals(flatId: string) {
-  const rows = await prisma.preApproval.findMany({ where: { flatId }, orderBy: { date: 'desc' }, take: 50 })
+  const rows = await repo.preApprovalsFor(flatId)
   return rows.map((p) => ({ id: p.id, flatId: p.flatId, guestName: p.guestName, date: istDay(p.date), used: p.used }))
 }
 
@@ -197,9 +193,9 @@ export const resetVerifyLimits = () => attempts.clear()
 export async function verifyCode(guard: AuthUser, actor: Actor, code: string, gateId: string, now = new Date()) {
   const recent = (attempts.get(guard.id) ?? []).filter((t) => now.getTime() - t < 10 * 60_000)
   if (recent.length >= VERIFY_LIMIT) throw tooMany('Too many wrong codes. Wait a few minutes or call the help desk.')
-  const gate = await prisma.gate.findUnique({ where: { id: gateId } })
+  const gate = await repo.gateById(gateId)
   if (!gate) throw notFound('Gate not found')
-  const p = await prisma.preApproval.findUnique({ where: { codeHash: hashCode(code) } })
+  const p = await repo.preApprovalByHash(hashCode(code))
   const valid = !!p && !p.used && istDay(p.date) === istDay(now)
   if (!valid) {
     recent.push(now.getTime())
@@ -222,16 +218,16 @@ export async function verifyCode(guard: AuthUser, actor: Actor, code: string, ga
 
 /** DPDP: visitor photos are removed once their delete-after date has passed. The visit record stays, the photo goes. */
 export async function purgeExpiredPhotos(now = new Date()) {
-  const due = await prisma.visitor.findMany({ where: { photoPath: { not: null }, photoDeleteAfter: { lt: now } }, select: { id: true, photoPath: true } })
+  const due = await repo.photosDue(now)
   for (const v of due) {
     await storage.delete(v.photoPath!)
-    await prisma.visitor.update({ where: { id: v.id }, data: { photoPath: null } })
+    await repo.clearPhoto(v.id)
   }
   if (due.length) await writeAudit(prisma, systemActor, { action: 'retention.visitor_photos_deleted', entity: 'Visitor', entityId: 'batch', after: { count: due.length }, detail: `Deleted ${due.length} photos older than ${PHOTO_DAYS} days` })
   return { deleted: due.length }
 }
 
-export const listGates = () => prisma.gate.findMany({ orderBy: { id: 'asc' } })
+export const listGates = () => repo.gates()
 
 /** "Neeraj Kulkarni" -> "Neeraj K." The gate needs to recognise a flat, not to learn full names. */
 export const shortName = (full: string) => {
@@ -240,12 +236,6 @@ export const shortName = (full: string) => {
 }
 
 export async function gateFlats(page: { skip: number; take: number }) {
-  const [rows, total] = await Promise.all([
-    prisma.flat.findMany({
-      orderBy: [{ towerNo: 'asc' }, { number: 'asc' }], ...page,
-      include: { members: { where: { active: true, relation: { in: ['OWNER', 'TENANT'] } }, include: { user: { select: { name: true } } }, take: 1 } },
-    }),
-    prisma.flat.count(),
-  ])
+  const [rows, total] = await repo.flatsPage(page.skip, page.take)
   return { total, items: rows.map((f) => ({ id: f.id, towerNo: f.towerNo, residentName: f.members[0] ? shortName(f.members[0].user.name) : '' })) }
 }
