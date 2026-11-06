@@ -6,3 +6,5 @@ storage
 *.log
 .DS_Store
 storage-test
+dev-dist
+*.tsbuildinfo
