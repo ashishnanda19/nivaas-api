@@ -253,8 +253,8 @@ async function main() {
     ['लिफ्ट बंद है, कृपया दुरुस्त करा', 'LIFT'], ['पार्किंगमध्ये गाडी लावली आहे, रस्ता अडला आहे', 'PARKING'], ['नळाला पाणी कमी येते आहे', 'WATER_SUPPLY'],
     ['Parcel locker door is broken', undefined], ['Suggestion: add a bench near the children play area', undefined],
   ]
-  const statuses: ComplaintStatus[] = [...Array(8).fill('NEW'), ...Array(8).fill('ASSIGNED'), ...Array(11).fill('IN_PROGRESS'), ...Array(22).fill('RESOLVED'), ...Array(2).fill('REOPENED')] as ComplaintStatus[]
-  for (let i = 0; i < 46 && i < statuses.length; i++) {
+  const statuses: ComplaintStatus[] = [...Array(8).fill('NEW'), ...Array(8).fill('ASSIGNED'), ...Array(10).fill('IN_PROGRESS'), ...Array(17).fill('RESOLVED'), ...Array(3).fill('REOPENED')] as ComplaintStatus[]
+  for (let i = 0; i < statuses.length; i++) {
     const [text, category] = pool[i % pool.length]
     const status = statuses[i]
     // the three sample flats keep exactly the complaints the brief lists, so they are never picked here
