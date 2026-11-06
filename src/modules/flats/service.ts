@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/db.js'
+import { flatRepo as repo } from './repo.js'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
 import { maskPhone } from '../../lib/phone.js'
 import { currentBill } from '../billing/service.js'
@@ -16,17 +17,11 @@ export async function listFlats(q: { search?: string; tower?: number; skip: numb
       ? { OR: [{ id: { contains: q.search, mode: 'insensitive' as const } }, { members: { some: { user: { name: { contains: q.search, mode: 'insensitive' as const } } } } }] }
       : {}),
   }
-  const [flats, total] = await Promise.all([
-    prisma.flat.findMany({
-      where, orderBy: [{ towerNo: 'asc' }, { number: 'asc' }], skip: q.skip, take: q.take,
-      include: { members: { where: { active: true }, include: { user: { select: { name: true } } } }, knownPayers: { select: { upiId: true } } },
-    }),
-    prisma.flat.count({ where }),
-  ])
+  const [flats, total] = await repo.page(where, q.skip, q.take)
   const ids = flats.map((f) => f.id)
-  const sums = await prisma.ledgerEntry.groupBy({ by: ['flatId'], where: { flatId: { in: ids } }, _sum: { amountPaise: true } })
+  const sums = await repo.balances(ids)
   const bal = new Map(sums.map((s) => [s.flatId, s._sum.amountPaise ?? 0]))
-  const oldest = await prisma.bill.findMany({ where: { flatId: { in: ids }, status: { not: 'PAID' } }, orderBy: { dueDate: 'asc' }, distinct: ['flatId'] })
+  const oldest = await repo.oldestUnpaidBills(ids)
   const now = new Date()
   const od = new Map(oldest.map((b) => [b.flatId, Math.max(0, daysBetween(b.dueDate, now))]))
   return {
@@ -44,15 +39,15 @@ export async function listFlats(q: { search?: string; tower?: number; skip: numb
 }
 
 export async function flatSummary(flatId: string) {
-  const flat = await prisma.flat.findUnique({ where: { id: flatId } })
+  const flat = await repo.byId(flatId)
   if (!flat) throw notFound('Flat not found')
   const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
   const [bill, dues, openComplaints, visitorsToday, waiting] = await Promise.all([
     currentBill(flatId),
     flatDues(prisma, flatId),
-    prisma.complaint.count({ where: { flatId, status: { not: 'RESOLVED' } } }),
-    prisma.visitor.count({ where: { flatId, createdAt: { gte: startOfDay } } }),
-    prisma.visitor.count({ where: { flatId, status: 'WAITING' } }),
+    repo.openComplaints(flatId),
+    repo.visitorsSince(flatId, startOfDay),
+    repo.waitingVisitors(flatId),
   ])
   return {
     flat: { id: flat.id, towerNo: flat.towerNo, areaSqft: flat.areaSqft },
@@ -61,7 +56,7 @@ export async function flatSummary(flatId: string) {
 }
 
 export async function listMembers(flatId: string, viewer: AuthUser, actor: Actor, reveal: boolean) {
-  const rows = await prisma.flatMember.findMany({ where: { flatId, active: true }, include: { user: true }, orderBy: { id: 'asc' } })
+  const rows = await repo.activeMembers(flatId)
   const own = viewer.flatIds.includes(flatId)
   if (isOps(viewer) && reveal) {
     await writeAudit(prisma, actor, { action: 'pii.view', entity: 'Flat', entityId: flatId, detail: 'Viewed member phone numbers' })
@@ -74,31 +69,31 @@ export async function listMembers(flatId: string, viewer: AuthUser, actor: Actor
 
 async function canManage(viewer: AuthUser, flatId: string) {
   if (isOps(viewer)) return
-  const m = await prisma.flatMember.findFirst({ where: { flatId, userId: viewer.id, active: true } })
+  const m = await repo.activeMembership(flatId, viewer.id)
   if (!m || m.relation === 'FAMILY') throw forbidden('Only the owner or tenant can manage members')
 }
 
 export async function addMember(flatId: string, viewer: AuthUser, actor: Actor, b: { name: string; phone: string; relation: MemberRelation }) {
   await canManage(viewer, flatId)
-  if (!(await prisma.flat.findUnique({ where: { id: flatId } }))) throw notFound('Flat not found')
+  if (!(await repo.byId(flatId))) throw notFound('Flat not found')
   if (b.relation === 'OWNER' && !isOps(viewer)) throw forbidden('Only the help desk can add an owner')
-  const user = await prisma.user.upsert({ where: { phone: b.phone }, update: {}, create: { phone: b.phone, name: b.name, role: 'RESIDENT' } })
+  const user = await repo.upsertResident(b.phone, b.name)
   if (user.role !== 'RESIDENT') throw conflict('This number belongs to a staff account')
-  const existing = await prisma.flatMember.findUnique({ where: { userId_flatId: { userId: user.id, flatId } } })
+  const existing = await repo.membership(user.id, flatId)
   if (existing?.active) throw conflict('Already a member of this flat')
   const m = existing
-    ? await prisma.flatMember.update({ where: { id: existing.id }, data: { active: true, relation: b.relation } })
-    : await prisma.flatMember.create({ data: { userId: user.id, flatId, relation: b.relation } })
+    ? await repo.reactivate(existing.id, b.relation)
+    : await repo.addMember(user.id, flatId, b.relation)
   await writeAudit(prisma, actor, { action: 'member.add', entity: 'Flat', entityId: flatId, after: { memberId: m.id, relation: b.relation } })
   return { id: m.id, flatId, name: user.name, relation: m.relation, phone: user.phone }
 }
 
 export async function removeMember(flatId: string, memberId: string, viewer: AuthUser, actor: Actor) {
   await canManage(viewer, flatId)
-  const m = await prisma.flatMember.findFirst({ where: { id: memberId, flatId, active: true } })
+  const m = await repo.activeMemberById(flatId, memberId)
   if (!m) throw notFound('Member not found')
   if (m.userId === viewer.id) throw badRequest('You cannot remove yourself')
-  await prisma.flatMember.update({ where: { id: m.id }, data: { active: false } })
+  await repo.deactivate(m.id)
   await writeAudit(prisma, actor, { action: 'member.remove', entity: 'Flat', entityId: flatId, before: { memberId: m.id } })
   return { ok: true }
 }
