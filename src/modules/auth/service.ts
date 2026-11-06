@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import argon2 from 'argon2'
 import type { Role } from '@prisma/client'
 import { prisma } from '../../lib/db.js'
 import { config } from '../../lib/config.js'
@@ -19,6 +18,14 @@ export const otpRequestCap = (fixedMode: boolean) => (fixedMode ? OTP_MAX_REQUES
 
 const FIXED = '123456'
 
+/**
+ * A one-time code is only six digits, so no hash can protect it if the database leaks; what protects it is that it lives
+ * five minutes and allows five tries. It is stored as a keyed HMAC bound to the phone number, not in the clear, and not
+ * with a password hash, whose deliberate slowness would only make every sign-in wait.
+ */
+export const hashOtp = (phone: string, code: string) => crypto.createHmac('sha256', config.JWT_SECRET).update(`otp:${phone}:${code}`).digest('hex')
+const sameHash = (a: string, b: string) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))
+
 /** The fixed demo code is accepted when enabled globally (non-production) or for an explicitly listed demo account. */
 export const usesFixedCode = (phone: string, cfg: Pick<typeof config, 'OTP_FIXED_CODE_ENABLED' | 'demoPhones'> = config) => cfg.OTP_FIXED_CODE_ENABLED || cfg.demoPhones.has(phone)
 
@@ -31,7 +38,7 @@ export async function requestOtp(phone: string, sms: MessageProvider, now = new 
   const user = await repo.userByPhone(phone)
   // Same response whether or not the number is registered, so numbers cannot be enumerated.
   const code = usesFixedCode(phone) ? FIXED : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
-  await repo.createOtp({ phone, codeHash: await argon2.hash(code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) })
+  await repo.createOtp({ phone, codeHash: hashOtp(phone, code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) })
   if (user) await sms.sendSms(phone, `Your Nivaas code is ${code}. It expires in 5 minutes.`)
   return { sent: true, expiresInSec: OTP_TTL_MS / 1000 }
 }
@@ -41,7 +48,7 @@ export async function verifyOtp(phone: string, code: string, ip: string | undefi
   if (!otp || otp.expiresAt < now) throw new AppError(401, 'OTP_INVALID', 'Code expired or not requested. Ask for a new one.')
   if (otp.attempts >= OTP_MAX_ATTEMPTS) throw tooMany('Too many wrong codes. Ask for a new one.')
   await repo.countOtpAttempt(otp.id)
-  if (!(await argon2.verify(otp.codeHash, code))) throw new AppError(401, 'OTP_INVALID', 'That code is not right.')
+  if (!sameHash(otp.codeHash, hashOtp(phone, code))) throw new AppError(401, 'OTP_INVALID', 'That code is not right.')
 
   const user = await repo.userByPhone(phone)
   if (!user) throw new AppError(401, 'OTP_INVALID', 'That code is not right.')

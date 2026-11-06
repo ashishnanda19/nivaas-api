@@ -1,7 +1,6 @@
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
-# python3, make and g++ are only used to compile native modules (argon2) when no prebuilt binary matches the platform.
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma

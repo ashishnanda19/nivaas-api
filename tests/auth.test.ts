@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '../src/lib/db.js'
 import { auth, login, makeApp, PHONES, seedFixture } from './helpers.js'
-import { OTP_MAX_ATTEMPTS, OTP_MAX_REQUESTS_FIXED_MODE, otpRequestCap } from '../src/modules/auth/service.js'
+import { hashOtp, OTP_MAX_ATTEMPTS, OTP_MAX_REQUESTS_FIXED_MODE, otpRequestCap } from '../src/modules/auth/service.js'
 
 let app: Awaited<ReturnType<typeof makeApp>>['app']
 beforeEach(async () => {
@@ -101,5 +101,18 @@ describe('sessions and consent', () => {
   it('health reports db, queue and ai mode', async () => {
     const r = await app.inject({ method: 'GET', url: '/health' })
     expect(r.json()).toMatchObject({ db: 'up', ai: 'rules-only' })
+  })
+})
+
+describe('OTP storage', () => {
+  it('stores a keyed hash bound to the phone, never the code', async () => {
+    await seedFixture()
+    const { app } = await makeApp()
+    await app.inject({ method: 'POST', url: '/api/v1/auth/otp/request', payload: { phone: PHONES.neeraj } })
+    const row = await prisma.otp.findFirstOrThrow({ where: { phone: PHONES.neeraj } })
+    expect(row.codeHash).not.toContain('123456')
+    expect(row.codeHash).toBe(hashOtp(PHONES.neeraj, '123456'))
+    expect(hashOtp(PHONES.swati, '123456')).not.toBe(row.codeHash)
+    expect(hashOtp(PHONES.neeraj, '654321')).not.toBe(row.codeHash)
   })
 })
