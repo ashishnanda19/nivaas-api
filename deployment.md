@@ -111,6 +111,7 @@ API:
 | `SMS_ALLOWED_PHONES` | with `twilio` | comma separated numbers that may receive messages. A real provider refuses to start without it unless `SMS_ALLOW_ALL=true` |
 | `SMS_ALLOW_ALL`, `SMS_DEFAULT_COUNTRY_CODE` | no | lift the allow-list on purpose; country code added to 10 digit numbers (default 91) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | no | primary model (default `gemini-2.5-flash-lite`). A free Gemini key allows only about 20 requests per model per day, after which Groq answers, so keep both keys set. Without keys the app runs on its rules classifier |
+| `GEMINI_EMBEDDING_MODEL` | no | model that turns complaints into vectors for duplicate linking (default `gemini-embedding-001`, uses `GEMINI_API_KEY`) |
 | `GROQ_API_KEY`, `GROQ_MODEL` | no | fallback model |
 | `STORAGE_DRIVER`, `STORAGE_DIR` | no | `local` (default) or `db` for hosts with no persistent disk |
 | `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | no | S3-compatible storage; wins over the other drivers when `S3_BUCKET` is set |
@@ -146,9 +147,21 @@ Two scripts measure the AI and matching logic on labelled data and write their r
 npm run eval:ai          # rules classifier and safety rules on 66 labelled complaints (English, Hindi, Marathi), no network
 npm run eval:ai:live     # also the full pipeline with the configured Gemini and Groq keys (about 7 minutes at free-tier pace)
 DATABASE_URL=... npm run eval:matching   # the sample bank statement against what a human accountant would decide; needs a seeded database
+npm run eval:dupes       # duplicate detection: word overlap against embeddings on 45 labelled pairs, threshold tuned on one half and reported on the other; needs GEMINI_API_KEY
 ```
 
 The labelled sets were written by the author of the rules, so the figures are an optimistic bound, not a benchmark on independent data. Results are in `eval/RESULTS-*.md`.
+
+## Duplicate complaints by meaning
+
+A new complaint is compared with open complaints from the same tower and category in the last 48 hours. When both have an embedding from the same model the decision is by meaning (cosine similarity at 0.95 or more), which links "the lift is not working" with "आज सुबह से लिफ्ट बंद है". When either side has none, or the embedder fails or is out of quota, it falls back to word overlap, so a complaint is always filed. The text is redacted before it is embedded, and each link records how it was found (`meaning`, `words` or `manual`) and its score. Safety complaints are never linked.
+
+Complaints created before embeddings were switched on have none. Compute them once, resumably, against the database in `DATABASE_URL`:
+
+```bash
+npm run embeddings:backfill -- --dry-run   # count only; prints the database host first
+npm run embeddings:backfill
+```
 
 ## Keeping the live demo awake
 

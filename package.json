@@ -15,7 +15,9 @@
     "seed:prod": "node dist/prisma/seed.js",
     "eval:ai": "tsx eval/ai-accuracy.ts",
     "eval:ai:live": "tsx eval/ai-accuracy.ts --live",
-    "eval:matching": "tsx eval/matching.ts"
+    "eval:matching": "tsx eval/matching.ts",
+    "eval:dupes": "tsx eval/duplicates.ts",
+    "embeddings:backfill": "tsx scripts/backfill-embeddings.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1163.0",
