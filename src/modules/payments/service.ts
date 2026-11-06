@@ -4,6 +4,7 @@ import { config } from '../../lib/config.js'
 import { AppError, badRequest, notFound } from '../../lib/errors.js'
 import { postPaymentEntries } from '../billing/ledger.js'
 import { writeAudit, systemActor, type Actor } from '../audit/service.js'
+import { paymentRepo as repo } from './repo.js'
 import type { PayMode } from '@prisma/client'
 
 export const sign = (raw: string) => crypto.createHmac('sha256', config.PAYMENT_WEBHOOK_SECRET).update(raw).digest('hex')
@@ -20,21 +21,19 @@ export async function createIntent(p: { flatId: string; userId: string; amountPa
   if (p.amountPaise > 1_000_000_00) throw badRequest('Amount is too large for one payment')
   const key = p.idempotencyKey ? `${p.userId}:${p.idempotencyKey}` : undefined
   if (key) {
-    const existing = await prisma.payment.findUnique({ where: { idempotencyKey: key } })
+    const existing = await repo.byIdempotencyKey(key)
     if (existing) return toIntent(existing)
   }
   try {
-    const pay = await prisma.payment.create({
-      data: {
-        flatId: p.flatId, amountPaise: p.amountPaise, mode: p.mode, source: 'TEST_GATEWAY',
-        reference: `TG${crypto.randomBytes(5).toString('hex').toUpperCase()}`, idempotencyKey: key,
-      },
+    const pay = await repo.create({
+      flatId: p.flatId, amountPaise: p.amountPaise, mode: p.mode, source: 'TEST_GATEWAY',
+      reference: `TG${crypto.randomBytes(5).toString('hex').toUpperCase()}`, idempotencyKey: key,
     })
     return toIntent(pay)
   } catch (e) {
     // Two requests with the same key raced: return the winner.
     if (key && (e as { code?: string }).code === 'P2002') {
-      const winner = await prisma.payment.findUnique({ where: { idempotencyKey: key } })
+      const winner = await repo.byIdempotencyKey(key)
       if (winner) return toIntent(winner)
     }
     throw e
@@ -71,17 +70,13 @@ export async function confirmPayment(paymentId: string, outcome: 'success' | 'fa
 }
 
 export async function getPayment(id: string) {
-  const p = await prisma.payment.findUnique({ where: { id }, include: { receipt: true } })
+  const p = await repo.byIdWithReceipt(id)
   if (!p) throw notFound('Payment not found')
   return p
 }
 
 export async function listPayments(flatId: string, skip: number, take: number) {
-  const where = { flatId, status: 'SUCCESS' as const }
-  const [items, total] = await Promise.all([
-    prisma.payment.findMany({ where, orderBy: { paidAt: 'desc' }, skip, take, include: { receipt: true } }),
-    prisma.payment.count({ where }),
-  ])
+  const [items, total] = await repo.successfulPage(flatId, skip, take)
   return { items: items.map(paymentView), total }
 }
 
@@ -93,9 +88,7 @@ export const paymentView = (p: Awaited<ReturnType<typeof getPayment>>) => ({
 export async function receiptData(paymentId: string) {
   const p = await getPayment(paymentId)
   if (p.status !== 'SUCCESS' || !p.receipt) throw new AppError(409, 'NO_RECEIPT', 'No receipt for this payment')
-  const member = await prisma.flatMember.findFirst({
-    where: { flatId: p.flatId, active: true }, include: { user: { select: { name: true } } }, orderBy: { relation: 'asc' },
-  })
+  const member = await repo.primaryMemberName(p.flatId)
   return { payment: p, residentName: member?.user.name ?? 'Resident' }
 }
 

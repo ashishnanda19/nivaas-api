@@ -6,6 +6,7 @@ import { config } from '../../lib/config.js'
 import { AppError, badRequest, tooMany, unauthorized } from '../../lib/errors.js'
 import { hashToken, newRefreshToken, REFRESH_TTL_SEC, signAccess } from '../../lib/auth.js'
 import { writeAudit } from '../audit/service.js'
+import { authRepo as repo } from './repo.js'
 import type { MessageProvider } from './messages.js'
 
 export const OTP_TTL_MS = 5 * 60 * 1000
@@ -20,41 +21,34 @@ const FIXED = '123456'
 
 export async function requestOtp(phone: string, sms: MessageProvider, now = new Date()) {
   const since = new Date(now.getTime() - OTP_WINDOW_MS)
-  const recent = await prisma.otp.count({ where: { phone, createdAt: { gte: since } } })
+  const recent = await repo.countOtpsSince(phone, since)
   const cap = otpRequestCap(config.OTP_FIXED_CODE_ENABLED)
   if (recent >= cap) throw tooMany('Too many codes requested for this number. Try again in a few minutes.')
 
-  const user = await prisma.user.findUnique({ where: { phone } })
+  const user = await repo.userByPhone(phone)
   // Same response whether or not the number is registered, so numbers cannot be enumerated.
   const code = config.OTP_FIXED_CODE_ENABLED ? FIXED : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
-  await prisma.otp.create({
-    data: { phone, codeHash: await argon2.hash(code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) },
-  })
+  await repo.createOtp({ phone, codeHash: await argon2.hash(code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) })
   if (user) await sms.sendSms(phone, `Your Nivaas code is ${code}. It expires in 5 minutes.`)
   return { sent: true, expiresInSec: OTP_TTL_MS / 1000 }
 }
 
 export async function verifyOtp(phone: string, code: string, ip: string | undefined, now = new Date()) {
-  const otp = await prisma.otp.findFirst({
-    where: { phone, usedAt: null },
-    orderBy: { createdAt: 'desc' },
-  })
+  const otp = await repo.latestOpenOtp(phone)
   if (!otp || otp.expiresAt < now) throw new AppError(401, 'OTP_INVALID', 'Code expired or not requested. Ask for a new one.')
   if (otp.attempts >= OTP_MAX_ATTEMPTS) throw tooMany('Too many wrong codes. Ask for a new one.')
-  await prisma.otp.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } })
+  await repo.countOtpAttempt(otp.id)
   if (!(await argon2.verify(otp.codeHash, code))) throw new AppError(401, 'OTP_INVALID', 'That code is not right.')
 
-  const user = await prisma.user.findUnique({ where: { phone } })
+  const user = await repo.userByPhone(phone)
   if (!user) throw new AppError(401, 'OTP_INVALID', 'That code is not right.')
-  await prisma.otp.update({ where: { id: otp.id }, data: { usedAt: now } })
+  await repo.markOtpUsed(otp.id, now)
   return issueSession(user.id, ip)
 }
 
 export async function issueSession(userId: string, ip?: string) {
   const refresh = newRefreshToken()
-  await prisma.refreshToken.create({
-    data: { userId, tokenHash: hashToken(refresh), expiresAt: new Date(Date.now() + REFRESH_TTL_SEC * 1000) },
-  })
+  await repo.createRefresh(userId, hashToken(refresh), new Date(Date.now() + REFRESH_TTL_SEC * 1000))
   const user = await publicUser(userId)
   await writeAudit(prisma, { id: userId, name: user.name, role: user.role, ip }, {
     action: 'auth.login', entity: 'User', entityId: userId,
@@ -63,25 +57,23 @@ export async function issueSession(userId: string, ip?: string) {
 }
 
 export async function refreshSession(token: string) {
-  const row = await prisma.refreshToken.findUnique({ where: { tokenHash: hashToken(token) } })
+  const row = await repo.refreshByHash(hashToken(token))
   if (!row || row.revokedAt || row.expiresAt < new Date()) {
     if (row?.revokedAt) {
       // A rotated token was presented again: assume theft and revoke every session for the user.
-      await prisma.refreshToken.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } })
+      await repo.revokeAllRefresh(row.userId)
     }
     throw unauthorized('Session expired')
   }
-  await prisma.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } })
+  await repo.revokeRefresh(row.id)
   const next = newRefreshToken()
-  await prisma.refreshToken.create({
-    data: { userId: row.userId, tokenHash: hashToken(next), expiresAt: new Date(Date.now() + REFRESH_TTL_SEC * 1000) },
-  })
+  await repo.createRefresh(row.userId, hashToken(next), new Date(Date.now() + REFRESH_TTL_SEC * 1000))
   return { accessToken: signAccess(row.userId), refreshToken: next, user: await publicUser(row.userId) }
 }
 
 export async function logout(token?: string) {
   if (!token) return
-  await prisma.refreshToken.updateMany({ where: { tokenHash: hashToken(token), revokedAt: null }, data: { revokedAt: new Date() } })
+  await repo.revokeRefreshByHash(hashToken(token))
 }
 
 export interface PublicUser {
@@ -98,10 +90,7 @@ export interface PublicUser {
 }
 
 export async function publicUser(id: string): Promise<PublicUser> {
-  const u = await prisma.user.findUniqueOrThrow({
-    where: { id },
-    include: { members: { where: { active: true }, orderBy: { id: 'asc' } } },
-  })
+  const u = await repo.userWithMemberships(id)
   return {
     id: u.id,
     name: u.name,
@@ -117,7 +106,7 @@ export async function publicUser(id: string): Promise<PublicUser> {
 }
 
 export async function recordConsent(userId: string, ip?: string) {
-  const u = await prisma.user.update({ where: { id: userId }, data: { consentAt: new Date() } })
+  const u = await repo.setConsent(userId)
   await writeAudit(prisma, { id: u.id, name: u.name, role: u.role, ip }, {
     action: 'consent.record', entity: 'User', entityId: u.id, detail: 'DPDP Act 2023 notice accepted',
   })
@@ -126,6 +115,6 @@ export async function recordConsent(userId: string, ip?: string) {
 
 export async function setLanguage(userId: string, language: string) {
   if (!['en', 'hi', 'mr'].includes(language)) throw badRequest('Unsupported language')
-  await prisma.user.update({ where: { id: userId }, data: { language } })
+  await repo.setLanguage(userId, language)
   return publicUser(userId)
 }
