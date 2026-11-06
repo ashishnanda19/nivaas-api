@@ -5,6 +5,7 @@ import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
 import { isOps, signFileToken, type AuthUser } from '../../lib/auth.js'
 import { storage, requireImage } from '../../lib/storage.js'
 import { writeAudit, systemActor, type Actor } from '../audit/service.js'
+import { complaintRepo as repo, INCLUDE } from './repo.js'
 import { classifyComplaint, type Classification } from '../ai/classify.js'
 import { defaultClients, type LlmClient } from '../ai/llm.js'
 
@@ -80,7 +81,7 @@ export interface CreateInput {
 }
 
 export async function createComplaint(user: AuthUser, input: CreateInput, now = new Date()) {
-  const flat = await prisma.flat.findUnique({ where: { id: input.flatId }, include: { members: { include: { user: { select: { name: true } } } } } })
+  const flat = await repo.flatWithMembers(input.flatId)
   if (!flat) throw notFound('Flat not found')
   const knownNames = flat.members.map((m) => m.user.name)
   const ai: Classification = await classifyComplaint({ text: input.text, userId: user.id, knownNames }, clients())
@@ -154,19 +155,12 @@ async function view(c: Full, extra: { author?: string; assignee?: string | null;
 
 async function hydrate(rows: Full[], user: AuthUser) {
   const ids = rows.map((r) => r.id)
-  const [authors, staff, links, counts] = await Promise.all([
-    prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.authorId))] } }, select: { id: true, name: true } }),
-    prisma.staffMember.findMany({ select: { id: true, name: true } }),
-    prisma.complaintLink.findMany({ where: { childId: { in: ids } } }),
-    prisma.complaintLink.groupBy({ by: ['parentId'], where: { parentId: { in: ids } }, _count: true }),
-  ])
-  const parents = await prisma.complaint.findMany({ where: { id: { in: links.map((l) => l.parentId) } }, select: { id: true, code: true } })
+  const [authors, staff, links, counts] = await repo.related([...new Set(rows.map((r) => r.authorId))], ids)
+  const parents = await repo.codesOf(links.map((l) => l.parentId))
   const A = new Map(authors.map((a) => [a.id, a.name])), S = new Map(staff.map((s) => [s.id, s.name]))
   const P = new Map(parents.map((p) => [p.id, p.code])), L = new Map(links.map((l) => [l.childId, l.parentId])), N = new Map(counts.map((c) => [c.parentId, c._count]))
   return Promise.all(rows.map((r) => view(r, { author: A.get(r.authorId), assignee: r.assigneeId ? S.get(r.assigneeId) : null, parentCode: L.has(r.id) ? P.get(L.get(r.id)!) : null, linked: N.get(r.id) ?? 0 }, user)))
 }
-
-const INCLUDE = { updates: { orderBy: { createdAt: 'asc' as const } } }
 
 export function scopeWhere(user: AuthUser): Prisma.ComplaintWhereInput {
   if (isOps(user)) return {}
@@ -186,18 +180,15 @@ export async function listComplaints(user: AuthUser, q: { flatId?: string; statu
       q.assigneeId ? { assigneeId: q.assigneeId } : {},
       q.escalated ? { escalated: q.escalated === 'true' } : {},
       q.search ? { OR: [{ text: { contains: q.search, mode: 'insensitive' } }, { code: { contains: q.search, mode: 'insensitive' } }, { flatId: { contains: q.search, mode: 'insensitive' } }] } : {},
-      q.includeLinked === 'true' ? {} : { NOT: { id: { in: (await prisma.complaintLink.findMany({ select: { childId: true } })).map((l) => l.childId) } } },
+      q.includeLinked === 'true' ? {} : { NOT: { id: { in: await repo.linkedChildIds() } } },
     ],
   }
-  const [rows, total] = await Promise.all([
-    prisma.complaint.findMany({ where, include: INCLUDE, orderBy: [{ escalated: 'desc' }, { createdAt: 'desc' }], skip: q.skip, take: q.take }),
-    prisma.complaint.count({ where }),
-  ])
+  const [rows, total] = await repo.page(where, q.skip, q.take)
   return { total, items: await hydrate(rows, user) }
 }
 
 async function load(user: AuthUser, code: string): Promise<Full> {
-  const c = await prisma.complaint.findFirst({ where: { AND: [{ code }, scopeWhere(user)] }, include: INCLUDE })
+  const c = await repo.scopedByCode(code, scopeWhere(user))
   if (!c) throw notFound('Complaint not found') // also what a resident gets for someone else's complaint
   return c
 }
@@ -205,13 +196,13 @@ async function load(user: AuthUser, code: string): Promise<Full> {
 export async function getComplaint(user: AuthUser, code: string) {
   const c = await load(user, code)
   const [v] = await hydrate([c], user)
-  const kids = await prisma.complaintLink.findMany({ where: { parentId: c.id } })
-  const linked = kids.length ? await prisma.complaint.findMany({ where: { id: { in: kids.map((k) => k.childId) } }, select: { code: true, flatId: true, createdAt: true }, orderBy: { createdAt: 'asc' } }) : []
+  const kids = await repo.childLinks(c.id)
+  const linked = kids.length ? await repo.childSummaries(kids.map((k) => k.childId)) : []
   return { ...v, linked: isOps(user) ? linked.map((l) => ({ id: l.code, flatId: l.flatId, createdAt: l.createdAt.toISOString() })) : undefined }
 }
 
 export async function photoFor(code: string) {
-  const c = await prisma.complaint.findUnique({ where: { code }, select: { photoPath: true } })
+  const c = await repo.photoPathOf(code)
   if (!c?.photoPath) throw notFound('No photo')
   const buf = await storage.get(c.photoPath)
   if (!buf) throw notFound('No photo')
@@ -233,7 +224,7 @@ export async function addComment(user: AuthUser, actor: Actor, code: string, tex
 
 export async function assign(user: AuthUser, actor: Actor, code: string, assigneeId: string) {
   const c = await load(user, code)
-  const to = await prisma.staffMember.findUnique({ where: { id: assigneeId } })
+  const to = await repo.staffById(assigneeId)
   if (!to) throw notFound('Staff member not found')
   await prisma.$transaction(async (tx) => {
     if (c.assigneeId && c.assigneeId !== to.id && c.status !== 'RESOLVED') await tx.staffMember.update({ where: { id: c.assigneeId }, data: { openLoad: { decrement: 1 } } })
@@ -316,16 +307,16 @@ export async function rate(user: AuthUser, code: string, rating: number) {
   const c = await load(user, code)
   if (user.role !== 'RESIDENT') throw forbidden('Only the resident rates a resolution')
   if (c.status !== 'RESOLVED') throw conflict('You can rate once it is resolved')
-  await prisma.complaint.update({ where: { id: c.id }, data: { rating } })
+  await repo.setRating(c.id, rating)
   return getComplaint(user, code)
 }
 
 export async function link(user: AuthUser, actor: Actor, code: string, parentCode: string) {
   if (code === parentCode) throw badRequest('A complaint cannot be linked to itself')
   const [child, parent] = await Promise.all([load(user, code), load(user, parentCode)])
-  const parentIsChild = await prisma.complaintLink.findUnique({ where: { childId: parent.id } })
+  const parentIsChild = await repo.linkOfChild(parent.id)
   if (parentIsChild) throw conflict('That complaint is itself linked under another one')
-  const hasKids = await prisma.complaintLink.count({ where: { parentId: child.id } })
+  const hasKids = await repo.countChildren(child.id)
   if (hasKids) throw conflict('This complaint already has duplicates linked under it')
   await prisma.$transaction(async (tx) => {
     await tx.complaintLink.upsert({ where: { childId: child.id }, update: { parentId: parent.id }, create: { parentId: parent.id, childId: child.id } })
@@ -336,7 +327,7 @@ export async function link(user: AuthUser, actor: Actor, code: string, parentCod
 
 export async function unlink(user: AuthUser, actor: Actor, code: string) {
   const c = await load(user, code)
-  const l = await prisma.complaintLink.findUnique({ where: { childId: c.id } })
+  const l = await repo.linkOfChild(c.id)
   if (!l) throw conflict('Not linked')
   await prisma.$transaction(async (tx) => {
     await tx.complaintLink.delete({ where: { childId: c.id } })
@@ -346,16 +337,13 @@ export async function unlink(user: AuthUser, actor: Actor, code: string) {
 }
 
 export async function listStaff() {
-  const rows = await prisma.staffMember.findMany({ orderBy: { name: 'asc' } })
+  const rows = await repo.staffAll()
   return rows.map((s) => ({ id: s.id, name: s.name, skills: s.skills, isDutyManager: s.isDutyManager, openLoad: s.openLoad }))
 }
 
 /** Job: a complaint with no first response after its due time is marked overdue once, for the metrics. */
 export async function markOverdue(now = new Date()) {
-  const r = await prisma.complaint.updateMany({
-    where: { responseDueAt: { lt: now }, firstResponseAt: null, overdueAt: null, status: { not: 'RESOLVED' } },
-    data: { overdueAt: now },
-  })
+  const r = await repo.markOverdue(now)
   return { marked: r.count }
 }
 
