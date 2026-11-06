@@ -92,3 +92,14 @@ export function assertFlatAccess(u: AuthUser, flatId: string) {
   if (u.role === 'RESIDENT' && u.flatIds.includes(flatId)) return
   throw forbidden()
 }
+
+/** Short-lived token that lets an <img> tag load one private file without an Authorization header. */
+export const signFileToken = (resource: string) => jwt.sign({ r: resource, aud: 'file' }, config.JWT_SECRET, { expiresIn: 10 * 60 })
+export function verifyFileToken(token: string, resource: string): boolean {
+  try {
+    const p = jwt.verify(token, config.JWT_SECRET, { audience: 'file' }) as { r: string }
+    return p.r === resource
+  } catch {
+    return false
+  }
+}

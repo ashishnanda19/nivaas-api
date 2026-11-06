@@ -55,6 +55,15 @@ export async function seedFixture() {
       { userId: aamir.id, flatId: 'T21-1601', relation: 'OWNER' },
     ],
   })
+  await prisma.staffMember.createMany({
+    data: [
+      { id: 'st-ravi', name: 'Ravi Pawar', skills: ['PLUMBING', 'WATER_SUPPLY'] },
+      { id: 'st-ravi2', name: 'Kiran Jadhav', skills: ['PLUMBING', 'WATER_SUPPLY'] },
+      { id: 'st-sunita', name: 'Sunita More', skills: ['ELECTRICAL', 'LIFT'] },
+      { id: 'st-asha', name: 'Asha Kale', skills: ['HOUSEKEEPING', 'GARDEN', 'PARKING', 'NOISE', 'SECURITY', 'OTHER'] },
+      { id: 'st-duty', name: 'Mr. Deshmukh (duty manager)', skills: [], isDutyManager: true },
+    ],
+  })
   await prisma.gate.createMany({ data: [{ id: 'G1', name: 'Main gate' }, { id: 'G2', name: 'Tower gate' }] })
   // Bills: period 47 / 18 days overdue for the two unpaid flats, current for Neeraj.
   const bill = async (flatId: string, area: number, daysOver: number, paid = 0) => {
@@ -104,3 +113,17 @@ export const SAMPLE_CSV = [
   '06/11/2026,43.21,NEFT 88231,unknown.person@ybl,Transfer',
   '06/11/2026,"7,475.00",UPI/T07-1203/MAINT,neeraj.k@okaxis,Maintenance',
 ].join('\n')
+
+// 1x1 PNG, enough for the magic-byte check
+export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+export function multipartFields(fields: Record<string, string>, file?: { name: string; data: Buffer; type: string }) {
+  const b = '----nivaas' + Math.random().toString(16).slice(2)
+  const parts: Buffer[] = []
+  for (const [k, v] of Object.entries(fields)) parts.push(Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`))
+  if (file) {
+    parts.push(Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="photo"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`), file.data, Buffer.from('\r\n'))
+  }
+  parts.push(Buffer.from(`--${b}--\r\n`))
+  return { payload: Buffer.concat(parts), headers: { 'content-type': `multipart/form-data; boundary=${b}` } }
+}
