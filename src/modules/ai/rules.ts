@@ -22,7 +22,7 @@ const SAFETY: Record<SafetyKind, RegExp[]> = {
   ],
   lift_trapped: [
     /\b(stuck|trapped|struck|locked|stranded)\b.{0,25}\b(lift|elevator)\b|\b(lift|elevator)\b.{0,30}\b(stuck|trapped|struck|stopped between|fell|free ?fall|door won'?t open)\b/i,
-    /लिफ्ट\s*(में|मध्ये|मधे|मे)\s*(फंस|फँस|अडक|अटक)|लिफ्ट\s*(अटक|अडक|रुक|बंद)|(फंस|फँस|अडक)\w*\s*लिफ्ट/,
+    /लिफ्ट\s*(में|मध्ये|मधे|मे)\s*(फंस|फँस|अडक|अटक)|लिफ्ट\s*(अटक|अडक|रुक)|(फंस|फँस|अडक)\w*\s*लिफ्ट/,
     /\blift\s*(mein|me|madhe)\s*(fas|fass|adak|atak)/i,
   ],
   electric: [

@@ -165,7 +165,7 @@ export async function photoFor(id: string) {
 
 // ---- pre-approvals ----------------------------------------------------------------------------
 
-const hashCode = (code: string) => crypto.createHmac('sha256', config.JWT_SECRET).update(`preapproval:${code}`).digest('hex')
+export const hashCode = (code: string) => crypto.createHmac('sha256', config.JWT_SECRET).update(`preapproval:${code}`).digest('hex')
 const istDay = (d: Date) => new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10)
 
 export async function createPreApproval(user: AuthUser, b: { flatId: string; guestName: string; date: Date }) {

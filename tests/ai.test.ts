@@ -72,7 +72,7 @@ describe('safety words win over the model', () => {
   })
 
   it('does not escalate ordinary complaints', async () => {
-    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है'])
+    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है', 'लिफ्ट बंद है', 'Lift not working in tower 14, display shows the wrong floor', 'Fixed asset register needs updating'])
       expect(detectSafety(t)).toBeNull()
   })
 })

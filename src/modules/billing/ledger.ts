@@ -10,6 +10,8 @@ export interface AppendInput {
   ref: string
   description: string
   period?: string
+  /** Only for seeding history. Normal postings use the current time. */
+  createdAt?: Date
 }
 
 /** Append one entry. Must be called inside a transaction so the flat row lock holds. */
@@ -27,6 +29,7 @@ export async function appendLedger(tx: Tx, p: AppendInput) {
       ref: p.ref,
       description: p.description,
       period: p.period,
+      ...(p.createdAt ? { createdAt: p.createdAt } : {}),
     },
   })
   return { entry, created: true }
