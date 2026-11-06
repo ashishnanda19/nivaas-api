@@ -121,7 +121,8 @@ async function main() {
   await demo('9800000030', 'Gate 1 tablet', 'GUARD', 'Main gate')
 
   const residentOf = new Map<string, string>() // flatId -> user id
-  let phoneSeq = 9700000100
+  // Generated residents get numbers no mobile operator issues (they start with 5), so a real SMS provider can never reach a real person.
+  let phoneSeq = 5000000100
   for (const f of ALL) {
     const num = f.id.split('-')[1]
     const tower = Number(f.id.slice(1, 3))

@@ -3,9 +3,9 @@ import { config } from './lib/config.js'
 import { logger } from './lib/logger.js'
 import { prisma } from './lib/db.js'
 import { registerJobs } from './jobs/index.js'
-import { ConsoleMessageProvider } from './modules/auth/messages.js'
+import { createMessageProvider } from './modules/auth/messages.js'
 
-const sms = new ConsoleMessageProvider()
+const sms = createMessageProvider()
 const app = await buildApp({ sms })
 registerJobs(app.scheduler, sms)
 await app.scheduler.start()

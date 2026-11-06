@@ -15,7 +15,7 @@ import swaggerUi from '@fastify/swagger-ui'
 import { collectRoutes, openApiDoc } from './lib/openapi.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { remindersRoutes } from './modules/reminders/routes.js'
-import { ConsoleMessageProvider, type MessageProvider } from './modules/auth/messages.js'
+import { createMessageProvider, type MessageProvider } from './modules/auth/messages.js'
 import { billingRoutes } from './modules/billing/routes.js'
 import { paymentRoutes } from './modules/payments/routes.js'
 import { flatRoutes } from './modules/flats/routes.js'
@@ -93,7 +93,7 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
 
   await app.register(
     async (api) => {
-      const sms = deps.sms ?? new ConsoleMessageProvider()
+      const sms = deps.sms ?? createMessageProvider()
       await api.register(authRoutes(sms))
       await api.register(remindersRoutes(sms))
       await api.register(flatRoutes)

@@ -26,6 +26,12 @@ services:
       - { key: JWT_SECRET, generateValue: true }
       - { key: JWT_REFRESH_SECRET, generateValue: true }
       - { key: PAYMENT_WEBHOOK_SECRET, generateValue: true }
+      # Text messages. Leave SMS_PROVIDER as console until Twilio is set up; a real provider needs SMS_ALLOWED_PHONES.
+      - { key: SMS_PROVIDER, value: console }
+      - { key: TWILIO_ACCOUNT_SID, sync: false }
+      - { key: TWILIO_AUTH_TOKEN, sync: false }
+      - { key: TWILIO_FROM, sync: false }
+      - { key: SMS_ALLOWED_PHONES, sync: false }
       - { key: GEMINI_API_KEY, sync: false }
       - { key: GEMINI_MODEL, value: gemini-2.5-flash-lite }
       - { key: GROQ_API_KEY, sync: false }

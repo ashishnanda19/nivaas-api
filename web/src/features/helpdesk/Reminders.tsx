@@ -20,7 +20,7 @@ export default function Reminders() {
   const run = useMutation({
     mutationFn: () => api.runReminders(),
     onSuccess: (r) => {
-      toast.success(r.sent ? `${r.sent} reminder${r.sent === 1 ? '' : 's'} sent` : 'Nothing new to send. Everyone due a reminder has had it.')
+      toast.success(r.sent ? `${r.sent} reminder${r.sent === 1 ? '' : 's'} sent${r.held ? `, ${r.held} not sent (not allowed)` : ''}` : r.held ? `${r.held} not sent: those numbers are not on the allowed list` : 'Nothing new to send. Everyone due a reminder has had it.')
       void qc.invalidateQueries({ queryKey: ['reminders'] })
       void qc.invalidateQueries({ queryKey: ['audit'] })
     },
@@ -66,6 +66,10 @@ export default function Reminders() {
                 <span className="text-muted">Failed: </span>
                 <span className="font-medium tabular-nums">{rows.filter((r) => r.status === 'FAILED').length}</span>
               </span>
+              <span title="Not on the list of numbers that may receive messages, or a demo account">
+                <span className="text-muted">Not sent: </span>
+                <span className="font-medium tabular-nums">{rows.filter((r) => r.status === 'SKIPPED').length}</span>
+              </span>
             </Card>
             <DataTable
               caption="Reminders sent"
@@ -77,7 +81,7 @@ export default function Reminders() {
                 { key: 'kind', header: 'Type', cell: (r) => <Badge tone={KIND[r.kind].tone}>{KIND[r.kind].label}</Badge> },
                 { key: 'lang', header: 'Language', cell: (r) => LANG[r.language] ?? r.language },
                 { key: 'msg', header: 'Message', cell: (r) => <span className="text-muted">{r.message}</span>, hideOnMobile: false },
-                { key: 'st', header: 'Status', cell: (r) => <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{r.status === 'SENT' ? 'Sent' : 'Failed'}</Badge> },
+                { key: 'st', header: 'Status', cell: (r) => <Badge tone={r.status === 'SENT' ? 'success' : r.status === 'FAILED' ? 'danger' : 'neutral'}>{r.status === 'SENT' ? 'Sent' : r.status === 'FAILED' ? 'Failed' : 'Not sent'}</Badge> },
               ]}
             />
           </>

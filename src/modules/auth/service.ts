@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import type { Role } from '@prisma/client'
 import { prisma } from '../../lib/db.js'
 import { config } from '../../lib/config.js'
+import { logger } from '../../lib/logger.js'
 import { AppError, badRequest, tooMany, unauthorized } from '../../lib/errors.js'
 import { hashToken, newRefreshToken, REFRESH_TTL_SEC, signAccess } from '../../lib/auth.js'
 import { writeAudit } from '../audit/service.js'
@@ -39,7 +40,14 @@ export async function requestOtp(phone: string, sms: MessageProvider, now = new 
   // Same response whether or not the number is registered, so numbers cannot be enumerated.
   const code = usesFixedCode(phone) ? FIXED : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
   await repo.createOtp({ phone, codeHash: hashOtp(phone, code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) })
-  if (user) await sms.sendSms(phone, `Your Nivaas code is ${code}. It expires in 5 minutes.`)
+  if (user) {
+    try {
+      await sms.sendSms(phone, `Your Nivaas code is ${code}. It expires in 5 minutes.`)
+    } catch (e) {
+      // The reply stays the same either way, so a failure cannot be used to find out which numbers are registered.
+      logger.error({ err: (e as Error).message }, 'could not send the sign-in code')
+    }
+  }
   return { sent: true, expiresInSec: OTP_TTL_MS / 1000 }
 }
 

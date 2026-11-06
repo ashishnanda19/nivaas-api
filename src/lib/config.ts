@@ -17,6 +17,16 @@ const schema = z.object({
   OTP_FIXED_CODE_ENABLED: bool,
   // Comma-separated phone numbers that accept the fixed demo code even in production (the seeded demo accounts). Empty by default.
   DEMO_OTP_PHONES: z.string().optional().default(''),
+  // Text messages. `console` records that a message was sent and delivers nothing. `twilio` delivers for real.
+  SMS_PROVIDER: z.enum(['console', 'twilio']).default('console'),
+  TWILIO_ACCOUNT_SID: z.string().optional().default(''),
+  TWILIO_AUTH_TOKEN: z.string().optional().default(''),
+  TWILIO_FROM: z.string().optional().default(''),
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional().default(''),
+  SMS_DEFAULT_COUNTRY_CODE: z.string().regex(/^\d{1,3}$/).default('91'),
+  // Safety: a real provider sends only to these numbers (comma separated) unless SMS_ALLOW_ALL is set on purpose.
+  SMS_ALLOWED_PHONES: z.string().optional().default(''),
+  SMS_ALLOW_ALL: bool,
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash-lite'),
   GROQ_API_KEY: z.string().optional().default(''),
@@ -35,7 +45,7 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
 })
 
-export type Config = z.infer<typeof schema> & { corsOrigins: string[]; isProd: boolean; demoPhones: Set<string> }
+export type Config = z.infer<typeof schema> & { corsOrigins: string[]; isProd: boolean; demoPhones: Set<string>; smsAllowed: Set<string> }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env)
@@ -49,11 +59,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (/change-me/.test(c.JWT_SECRET + c.JWT_REFRESH_SECRET + c.PAYMENT_WEBHOOK_SECRET))
       throw new Error('Placeholder secrets are not allowed in production')
   }
+  if (c.SMS_PROVIDER === 'twilio') {
+    if (!c.TWILIO_ACCOUNT_SID || !c.TWILIO_AUTH_TOKEN || !(c.TWILIO_FROM || c.TWILIO_MESSAGING_SERVICE_SID))
+      throw new Error('SMS_PROVIDER=twilio needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM (or TWILIO_MESSAGING_SERVICE_SID)')
+    if (!c.SMS_ALLOW_ALL && !c.SMS_ALLOWED_PHONES.trim())
+      throw new Error('A real SMS provider needs SMS_ALLOWED_PHONES (the numbers that may receive messages) or SMS_ALLOW_ALL=true, so seeded or test numbers can never be texted by accident')
+  }
   if (c.S3_BUCKET && (!c.S3_ACCESS_KEY_ID || !c.S3_SECRET_ACCESS_KEY)) throw new Error('S3_BUCKET is set but S3_ACCESS_KEY_ID or S3_SECRET_ACCESS_KEY is missing')
   return {
     ...c,
     corsOrigins: c.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     isProd: c.NODE_ENV === 'production',
+    smsAllowed: new Set(c.SMS_ALLOWED_PHONES.split(',').map((s) => s.trim()).filter(Boolean)),
     demoPhones: new Set(c.DEMO_OTP_PHONES.split(',').map((s) => s.trim()).filter(Boolean)),
   }
 }

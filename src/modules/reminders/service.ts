@@ -38,7 +38,7 @@ export async function runReminders(sms: MessageProvider, now = new Date(), actor
   const byFlat = new Map<string, typeof payers>()
   for (const p of payers) (byFlat.get(p.flatId) ?? byFlat.set(p.flatId, []).get(p.flatId)!).push(p)
 
-  const out = { checked: 0, sent: 0, failed: 0, skipped: 0 }
+  const out = { checked: 0, sent: 0, failed: 0, skipped: 0, held: 0 }
   for (const flatId of flatIds) {
     const dues = await flatDues(prisma, flatId)
     for (const bill of bills.filter((b) => b.flatId === flatId)) {
@@ -54,22 +54,26 @@ export async function runReminders(sms: MessageProvider, now = new Date(), actor
           name: m.user.name, flatId, period: periodLabel(bill.period), amountPaise: charge.remainingPaise + lateDue,
           dueDate: bill.dueDate.toISOString().slice(0, 10).split('-').reverse().join('/'), daysOverdue: due.daysOverdue,
         })
+        // SENT: handed to the provider. FAILED: the provider refused or was unreachable. SKIPPED: deliberately not sent
+        // (the number is not on the allow-list, or it is a demo account). FAILED and SKIPPED are looked at again on the next run.
         let status = 'SENT'
         try {
-          await sms.sendSms(m.user.phone, message)
+          if ((await sms.sendSms(m.user.phone, message)) === 'skipped') status = 'SKIPPED'
         } catch (e) {
           status = 'FAILED'
           logger.warn({ flatId, kind: due.kind, err: (e as Error).message }, 'reminder send failed')
         }
         const data = { billId: bill.id, flatId, userId: m.user.id, period: bill.period, kind: due.kind, language: m.user.language, phone: m.user.phone, message, status, sentAt: now }
-        if (existing) await repo.update(existing.id, { status, message, sentAt: now })
-        else await repo.create(data)
+        if (existing) {
+          if (existing.status !== status || status === 'FAILED') await repo.update(existing.id, { status, message, sentAt: now })
+        } else await repo.create(data)
         if (status === 'SENT') out.sent++
+        else if (status === 'SKIPPED') out.held++
         else out.failed++
       }
     }
   }
-  if (out.sent || out.failed) await writeAudit(prisma, actor, { action: 'reminders.run', entity: 'Reminder', entityId: istDay(now), after: out, detail: `${out.sent} reminders sent, ${out.failed} failed` })
+  if (out.sent || out.failed || out.held) await writeAudit(prisma, actor, { action: 'reminders.run', entity: 'Reminder', entityId: istDay(now), after: out, detail: `${out.sent} reminders sent, ${out.failed} failed, ${out.held} not sent (not allowed)` })
   return out
 }
 

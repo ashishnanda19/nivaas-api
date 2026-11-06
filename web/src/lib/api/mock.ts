@@ -743,7 +743,7 @@ export const mockApi = {
   },
   async runReminders(): Promise<ReminderRun> {
     await latency(true)
-    return { checked: 2, sent: 0, failed: 0, skipped: 2 }
+    return { checked: 2, sent: 0, failed: 0, skipped: 2, held: 0 }
   },
   async listAudit() {
     await latency(true)

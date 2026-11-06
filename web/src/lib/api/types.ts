@@ -180,7 +180,7 @@ export interface ReminderLog {
   language: string
   phone: string
   message: string
-  status: 'SENT' | 'FAILED'
+  status: 'SENT' | 'FAILED' | 'SKIPPED'
   at: string
 }
 export interface ReminderRun {
@@ -188,6 +188,7 @@ export interface ReminderRun {
   sent: number
   failed: number
   skipped: number
+  held: number
 }
 export interface Staff {
   id: string
