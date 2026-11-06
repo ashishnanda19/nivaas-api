@@ -1,21 +1,20 @@
-import type { Prisma, RowState } from '@prisma/client'
+import type { BankStatementRow, Prisma, RowState } from '@prisma/client'
 import { prisma } from '../../lib/db.js'
 import { badRequest, conflict, notFound } from '../../lib/errors.js'
 import { allocate, postPaymentEntries } from '../billing/ledger.js'
 import { writeAudit, type Actor } from '../audit/service.js'
 import { calcMaintenance } from '../../lib/money.js'
+import { matchingRepo as repo } from './repo.js'
 import { parseStatement } from './csv.js'
 import { isBulkPostable, matchRows, norm, type FlatInfo, type MatchResult } from './engine.js'
 
 /** Everything the engine needs about every flat, read in two queries. */
 export async function loadFlatInfos(): Promise<FlatInfo[]> {
-  const soc = await prisma.society.findFirstOrThrow()
+  const soc = await repo.society()
   const [flats, ledger, payers] = await Promise.all([
-    prisma.flat.findMany({
-      include: { members: { where: { active: true, relation: { in: ['OWNER', 'TENANT'] } }, include: { user: { select: { name: true } } } } },
-    }),
-    prisma.ledgerEntry.findMany({ orderBy: [{ flatId: 'asc' }, { seq: 'asc' }], select: { flatId: true, type: true, amountPaise: true, ref: true, period: true } }),
-    prisma.knownPayer.findMany({ where: { upiId: { not: null } } }),
+    repo.flatsWithResidents(),
+    repo.allLedger(),
+    repo.upiPayers(),
   ])
   const byFlat = new Map<string, typeof ledger>()
   for (const e of ledger) (byFlat.get(e.flatId) ?? byFlat.set(e.flatId, []).get(e.flatId)!).push(e)
@@ -34,7 +33,7 @@ export async function loadFlatInfos(): Promise<FlatInfo[]> {
 }
 
 export async function postedReferences(): Promise<Set<string>> {
-  const rows = await prisma.payment.findMany({ where: { source: 'BANK_CSV', status: 'SUCCESS' }, select: { reference: true } })
+  const rows = await repo.postedBankReferences()
   return new Set(rows.map((r) => norm(r.reference)))
 }
 
@@ -67,21 +66,16 @@ export async function uploadStatement(filename: string, text: string, actor: Act
 }
 
 export async function getUpload(id: string, page: { skip: number; take: number }, extra: { skipped?: number } = {}) {
-  const up = await prisma.bankStatementUpload.findUnique({ where: { id } })
+  const up = await repo.uploadById(id)
   if (!up) throw notFound('Upload not found')
-  const [rows, total, counts] = await Promise.all([
-    prisma.bankStatementRow.findMany({ where: { uploadId: id }, orderBy: { lineNo: 'asc' }, ...page }),
-    prisma.bankStatementRow.count({ where: { uploadId: id } }),
-    prisma.bankStatementRow.groupBy({ by: ['confidence', 'state'], where: { uploadId: id }, _count: true }),
-  ])
+  const [rows, total, counts] = await repo.rowsPage(id, page.skip, page.take)
   return {
     id: up.id, filename: up.filename, createdAt: up.createdAt.toISOString(), parseErrors: up.parseErrors, skipped: extra.skipped ?? 0,
     total, summary: counts.map((c) => ({ confidence: c.confidence, state: c.state, count: c._count })), rows: rows.map(rowView),
   }
 }
 
-type Row = Awaited<ReturnType<typeof prisma.bankStatementRow.findFirstOrThrow>>
-export const rowView = (r: Row) => {
+export const rowView = (r: BankStatementRow) => {
   const why = (r.reasons ?? {}) as { reasons?: string[]; candidates?: string[]; duplicateOf?: string | null }
   return {
     id: r.id, uploadId: r.uploadId, lineNo: r.lineNo, date: r.date.toISOString().slice(0, 10), amountPaise: r.amountPaise,
@@ -92,19 +86,12 @@ export const rowView = (r: Row) => {
 }
 
 export async function listUploads(page: { skip: number; take: number }) {
-  const [items, total] = await Promise.all([
-    prisma.bankStatementUpload.findMany({ orderBy: { createdAt: 'desc' }, ...page, include: { _count: { select: { rows: true } } } }),
-    prisma.bankStatementUpload.count(),
-  ])
+  const [items, total] = await repo.uploadsPage(page.skip, page.take)
   return { total, items: items.map((u) => ({ id: u.id, filename: u.filename, createdAt: u.createdAt.toISOString(), rows: u._count.rows })) }
 }
 
 export async function accountsQueue(page: { skip: number; take: number }) {
-  const where = { state: 'QUEUED' as RowState }
-  const [rows, total] = await Promise.all([
-    prisma.bankStatementRow.findMany({ where, orderBy: [{ date: 'desc' }, { lineNo: 'asc' }], ...page }),
-    prisma.bankStatementRow.count({ where }),
-  ])
+  const [rows, total] = await repo.queuePage(page.skip, page.take)
   return { total, items: rows.map(rowView) }
 }
 
@@ -157,10 +144,10 @@ export async function postRow(rowId: string, opts: PostOpts, actor: Actor) {
 }
 
 export async function rejectRow(rowId: string, reason: string, actor: Actor) {
-  const row = await prisma.bankStatementRow.findUnique({ where: { id: rowId } })
+  const row = await repo.rowById(rowId)
   if (!row) throw notFound('Row not found')
   if (row.state === 'POSTED') throw conflict('A posted row cannot be rejected. Reverse the ledger entry instead.')
-  await prisma.bankStatementRow.update({ where: { id: rowId }, data: { state: 'REJECTED' } })
+  await repo.setRowState(rowId, 'REJECTED')
   await writeAudit(prisma, actor, { action: 'statement.reject', entity: 'BankStatementRow', entityId: rowId, detail: reason })
   return { ok: true }
 }
@@ -170,8 +157,8 @@ export async function rejectRow(rowId: string, reason: string, actor: Actor) {
  * row whose bill was paid in the meantime is skipped rather than posted blindly.
  */
 export async function postAllExact(uploadId: string, actor: Actor) {
-  if (!(await prisma.bankStatementUpload.findUnique({ where: { id: uploadId } }))) throw notFound('Upload not found')
-  const rows = await prisma.bankStatementRow.findMany({ where: { uploadId, state: 'PENDING', confidence: 'EXACT', label: null }, orderBy: { lineNo: 'asc' } })
+  if (!(await repo.uploadById(uploadId))) throw notFound('Upload not found')
+  const rows = await repo.pendingExactRows(uploadId)
   const [flats, posted] = await Promise.all([loadFlatInfos(), postedReferences()])
   const out = { posted: 0, skipped: [] as { rowId: string; lineNo: number; reason: string }[] }
   for (const r of rows) {
@@ -181,7 +168,7 @@ export async function postAllExact(uploadId: string, actor: Actor) {
     })[0]
     if (!isBulkPostable(fresh) || fresh.suggestedFlatId !== r.suggestedFlatId) {
       out.skipped.push({ rowId: r.id, lineNo: r.lineNo, reason: 'Dues changed since the upload, review this row by hand' })
-      await prisma.bankStatementRow.update({ where: { id: r.id }, data: { state: 'QUEUED' } })
+      await repo.setRowState(r.id, 'QUEUED')
       continue
     }
     try {
