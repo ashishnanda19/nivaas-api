@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { guard } from '../../lib/auth.js'
-import { prisma } from '../../lib/db.js'
+import { auditRepo } from './repo.js'
 import { pageArgs, pageQuery } from '../../lib/pagination.js'
 import { parse } from '../../lib/validate.js'
 
@@ -25,10 +25,7 @@ export async function auditRoutes(app: FastifyInstance) {
       ...(q.entityId ? { entityId: q.entityId } : {}),
       ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: q.from } : {}), ...(q.to ? { lte: q.to } : {}) } } : {}),
     }
-    const [items, total] = await Promise.all([
-      prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, ...pageArgs(q) }),
-      prisma.auditLog.count({ where }),
-    ])
+    const [items, total] = await auditRepo.page(where, pageArgs(q).skip, pageArgs(q).take)
     return { items, page: q.page, pageSize: q.pageSize, total }
   })
 }

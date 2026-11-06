@@ -4,9 +4,10 @@ import { calcLateFee, calcMaintenance, daysBetween, type LateFeeConfig } from '.
 import { badRequest, notFound } from '../../lib/errors.js'
 import { appendLedger, flatDues, refreshBillStatuses } from './ledger.js'
 import { writeAudit, type Actor } from '../audit/service.js'
+import { billingRepo as repo } from './repo.js'
 
 export async function getSociety(db: Db = prisma) {
-  return db.society.findFirstOrThrow()
+  return repo.society(db)
 }
 
 export function lateFeeCfg(s: { graceDays: number; lateFeeMode: string; lateFeeFlatPaise: number; lateFeeMonthlyBp: number }): LateFeeConfig {
@@ -26,10 +27,7 @@ export const periodLabel = (period: string) =>
 export async function billRunPreview(period: string) {
   if (!periodOk(period)) throw badRequest('period must be YYYY-MM')
   const soc = await getSociety()
-  const flats = await prisma.flat.findMany({
-    orderBy: [{ towerNo: 'asc' }, { number: 'asc' }],
-    include: { bills: { where: { period }, select: { id: true } }, members: { where: { active: true, relation: { in: ['OWNER', 'TENANT'] } }, include: { user: { select: { name: true } } }, take: 1 } },
-  })
+  const flats = await repo.flatsForPreview(period)
   const rows = flats.map((f) => ({
     flatId: f.id,
     name: f.members[0]?.user.name ?? 'Unassigned',
@@ -52,7 +50,7 @@ export async function billRunPreview(period: string) {
 export async function billRunPublish(period: string, actor: Actor) {
   if (!periodOk(period)) throw badRequest('period must be YYYY-MM')
   const soc = await getSociety()
-  const flats = await prisma.flat.findMany({ select: { id: true, areaSqft: true } })
+  const flats = await repo.flatAreas()
   let created = 0
   let total = 0
   for (const f of flats) {
@@ -79,7 +77,7 @@ export async function billRunPublish(period: string, actor: Actor) {
 }
 
 export async function listBillRuns() {
-  const rows = await prisma.bill.groupBy({ by: ['period'], _count: true, _sum: { amountPaise: true }, orderBy: { period: 'desc' }, take: 24 })
+  const rows = await repo.runs()
   return rows.map((r) => ({ period: r.period, label: periodLabel(r.period), bills: r._count, totalPaise: r._sum.amountPaise ?? 0 }))
 }
 
@@ -100,7 +98,7 @@ export interface BillView {
 }
 
 async function viewOf(flatId: string, now: Date): Promise<BillView[]> {
-  const bills = await prisma.bill.findMany({ where: { flatId }, orderBy: { period: 'asc' } })
+  const bills = await repo.billsOfFlat(flatId)
   const dues = await flatDues(prisma, flatId)
   return bills.map((b) => {
     const c = dues.charges.find((x) => x.ref === `BILL:${b.period}`)
@@ -127,10 +125,7 @@ export async function billHistory(flatId: string, now = new Date()) {
 }
 
 export async function ledgerFor(flatId: string, page: { skip: number; take: number }) {
-  const [rows, total] = await Promise.all([
-    prisma.ledgerEntry.findMany({ where: { flatId }, orderBy: { seq: 'desc' }, ...page }),
-    prisma.ledgerEntry.count({ where: { flatId } }),
-  ])
+  const [rows, total] = await repo.ledgerPage(flatId, page.skip, page.take)
   return {
     total,
     rows: rows.map((e) => ({
@@ -163,7 +158,7 @@ export async function reverseEntry(flatId: string, entryId: string, reason: stri
 export async function runLateFees(now = new Date()) {
   const soc = await getSociety()
   const cfg = lateFeeCfg(soc)
-  const bills = await prisma.bill.findMany({ where: { status: { not: 'PAID' }, dueDate: { lt: now } } })
+  const bills = await repo.overdueUnpaid(now)
   let posted = 0
   const stamp = now.toISOString().slice(0, 10).replaceAll('-', '')
   for (const b of bills) {
