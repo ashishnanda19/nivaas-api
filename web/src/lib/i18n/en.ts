@@ -181,6 +181,7 @@ export const en = {
     pickSlot: 'Pick a slot',
     rules: 'Rules',
     fee: 'Fee',
+    payAtDesk: 'Fees are paid at the help desk. They are not added to your maintenance bill.',
     free: 'Included',
     confirmTitle: 'Confirm booking',
     confirmBtn: 'Confirm booking',

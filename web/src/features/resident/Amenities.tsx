@@ -137,6 +137,7 @@ function BookSheet({ amenity, onClose }: { amenity: Amenity | null; onClose: () 
                 {t('amenities.fee')}:{' '}
                 {amenity.fee ? `${inr(amenity.fee)} ${amenity.feeNote}` : t('amenities.free')}
               </p>
+              {amenity.fee > 0 && <p className="text-muted">{t('amenities.payAtDesk')}</p>}
               <p className="pt-1 font-medium">{t('amenities.rules')}</p>
               <ul className="list-disc space-y-1 pl-5 text-muted">
                 {amenity.rules.map((r) => (
