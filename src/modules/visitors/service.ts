@@ -232,3 +232,20 @@ export async function purgeExpiredPhotos(now = new Date()) {
 }
 
 export const listGates = () => prisma.gate.findMany({ orderBy: { id: 'asc' } })
+
+/** "Neeraj Kulkarni" -> "Neeraj K." The gate needs to recognise a flat, not to learn full names. */
+export const shortName = (full: string) => {
+  const parts = full.trim().split(/\s+/)
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]
+}
+
+export async function gateFlats(page: { skip: number; take: number }) {
+  const [rows, total] = await Promise.all([
+    prisma.flat.findMany({
+      orderBy: [{ towerNo: 'asc' }, { number: 'asc' }], ...page,
+      include: { members: { where: { active: true, relation: { in: ['OWNER', 'TENANT'] } }, include: { user: { select: { name: true } } }, take: 1 } },
+    }),
+    prisma.flat.count(),
+  ])
+  return { total, items: rows.map((f) => ({ id: f.id, towerNo: f.towerNo, residentName: f.members[0] ? shortName(f.members[0].user.name) : '' })) }
+}

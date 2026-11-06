@@ -218,3 +218,22 @@ describe('pre-approved guests', () => {
     expect((await call('POST', '/pre-approvals/verify', neeraj, { code: '123456', gateId: 'G1' })).statusCode).toBe(403)
   })
 })
+
+describe('gate flat lookup', () => {
+  it('gives the guard flat ids and abbreviated names only', async () => {
+    const r = (await call('GET', '/gate/flats', guard)).json()
+    expect(r.items).toEqual([
+      { id: 'T07-1203', towerNo: 7, residentName: 'Neeraj K.' },
+      { id: 'T12-0408', towerNo: 12, residentName: 'Swati J.' },
+      { id: 'T21-1601', towerNo: 21, residentName: 'Aamir S.' },
+    ])
+    expect(JSON.stringify(r)).not.toMatch(/phone|Kulkarni|balance|9000/)
+    expect(r.total).toBe(3)
+  })
+  it('is paginated and closed to residents and committee', async () => {
+    expect((await call('GET', '/gate/flats?pageSize=2', guard)).json().items).toHaveLength(2)
+    expect((await call('GET', '/gate/flats', neeraj)).statusCode).toBe(403)
+    expect((await call('GET', '/gate/flats', await login(app, PHONES.committee))).statusCode).toBe(403)
+    expect((await call('GET', '/gate/flats', hd)).statusCode).toBe(200)
+  })
+})

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { actorOf, assertFlatAccess, guard, verifyFileToken } from '../../lib/auth.js'
 import { forbidden } from '../../lib/errors.js'
-import { pageArgs } from '../../lib/pagination.js'
+import { pageArgs, pageQuery } from '../../lib/pagination.js'
 import { parse } from '../../lib/validate.js'
 import * as s from './schema.js'
 import * as svc from './service.js'
@@ -11,6 +11,13 @@ export async function visitorRoutes(app: FastifyInstance) {
   const read = { preHandler: guard({ roles: ['GUARD', 'RESIDENT', 'HELPDESK'] }) }
   const resident = { preHandler: guard({ roles: ['RESIDENT'] }) }
   const id = (r: FastifyRequest) => (r.params as { id: string }).id
+
+  // Flat picker for the gate tablet: flat ids and abbreviated names only, no phones, dues or members.
+  app.get('/gate/flats', { preHandler: guard({ roles: ['GUARD', 'HELPDESK'] }) }, async (req) => {
+    const q = parse(pageQuery, req.query)
+    const r = await svc.gateFlats(pageArgs(q))
+    return { items: r.items, page: q.page, pageSize: q.pageSize, total: r.total }
+  })
 
   app.get('/gates', read, async () => ({ items: await svc.listGates() }))
 
