@@ -1,0 +1,22 @@
+# Render blueprint for the API. Database: Neon or Supabase (free tier). Front end: Vercel.
+services:
+  - type: web
+    name: nivaas-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - { key: NODE_ENV, value: production }
+      - { key: OTP_FIXED_CODE_ENABLED, value: 'false' }
+      - { key: STORAGE_DIR, value: /data/storage }
+      - { key: DATABASE_URL, sync: false }
+      - { key: REDIS_URL, sync: false }
+      - { key: CORS_ORIGINS, sync: false }
+      - { key: JWT_SECRET, generateValue: true }
+      - { key: JWT_REFRESH_SECRET, generateValue: true }
+      - { key: PAYMENT_WEBHOOK_SECRET, generateValue: true }
+      - { key: GEMINI_API_KEY, sync: false }
+      - { key: GEMINI_MODEL, value: gemini-2.5-flash }
+      - { key: GROQ_API_KEY, sync: false }
+      - { key: GROQ_MODEL, value: llama-3.3-70b-versatile }

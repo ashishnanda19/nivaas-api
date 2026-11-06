@@ -10,6 +10,9 @@ import { prisma } from './lib/db.js'
 import { logger } from './lib/logger.js'
 import { AppError } from './lib/errors.js'
 import { Scheduler } from './lib/queue.js'
+import swagger from '@fastify/swagger'
+import swaggerUi from '@fastify/swagger-ui'
+import { collectRoutes, openApiDoc } from './lib/openapi.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { ConsoleMessageProvider, type MessageProvider } from './modules/auth/messages.js'
 import { billingRoutes } from './modules/billing/routes.js'
@@ -79,6 +82,13 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     const ok = db && (queue.ok || queue.mode === 'stopped')
     return reply.status(ok ? 200 : 503).send({ status: ok ? 'ok' : 'degraded', db: db ? 'up' : 'down', queue, ai: aiMode() })
   })
+
+  const doc = openApiDoc()
+  if (!config.isProd) {
+    collectRoutes(app as unknown as FastifyInstance, doc)
+    await app.register(swagger, { mode: 'static', specification: { document: doc as never } })
+    await app.register(swaggerUi, { routePrefix: '/docs' })
+  }
 
   await app.register(
     async (api) => {

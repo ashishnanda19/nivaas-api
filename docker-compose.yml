@@ -1,0 +1,40 @@
+# Local development services. Run the API itself with `npm run dev`.
+# The `api` profile also builds and runs the API in a container: docker compose --profile api up --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nivaas
+      POSTGRES_PASSWORD: nivaas
+      POSTGRES_DB: nivaas
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nivaas']
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+
+  api:
+    profiles: ['api']
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nivaas:nivaas@postgres:5432/nivaas
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: local-dev-secret-local-dev-secret
+      JWT_REFRESH_SECRET: local-dev-refresh-local-dev-refresh
+      PAYMENT_WEBHOOK_SECRET: local-dev-webhook
+      OTP_FIXED_CODE_ENABLED: 'true'
+      CORS_ORIGINS: http://localhost:5173
+    ports: ['4000:4000']
+    volumes: [uploads:/data/storage]
+
+volumes:
+  pgdata:
+  uploads:
