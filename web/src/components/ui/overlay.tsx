@@ -7,11 +7,17 @@ import { useIsDesktop } from '@/lib/hooks'
 
 function useDialog(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null)
+  // Callers often pass a new onClose on every render. If the effect depended on it, every keystroke in a form would tear the
+  // dialog down and set it up again, handing the focus back to the opener and then to the first field.
+  const close = useRef(onClose)
+  useEffect(() => {
+    close.current = onClose
+  })
   useEffect(() => {
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') close.current()
       if (e.key === 'Tab' && ref.current) {
         const els = ref.current.querySelectorAll<HTMLElement>(
           'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',
@@ -43,7 +49,7 @@ function useDialog(open: boolean, onClose: () => void) {
       document.body.style.overflow = ''
       prev?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
   return ref
 }
 
