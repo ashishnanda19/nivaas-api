@@ -1,0 +1,227 @@
+[
+ {
+  "a": "Lift in tower 14 is not working since morning",
+  "b": "The tower 14 elevator has stopped working today",
+  "duplicate": true
+ },
+ {
+  "a": "Lift not working in our tower since morning",
+  "b": "आज सुबह से हमारी बिल्डिंग की लिफ्ट बंद है",
+  "duplicate": true
+ },
+ {
+  "a": "The lift is out of order, please send a technician",
+  "b": "लिफ्ट बिघडली आहे, तंत्रज्ञ पाठवा",
+  "duplicate": true
+ },
+ {
+  "a": "No water in the taps since last night",
+  "b": "रात से नलों में पानी नहीं आ रहा",
+  "duplicate": true
+ },
+ {
+  "a": "There is no water supply on our floor since morning",
+  "b": "सकाळपासून आमच्या मजल्यावर पाणी येत नाही",
+  "duplicate": true
+ },
+ {
+  "a": "Water supply has stopped in tower 5",
+  "b": "टावर 5 में जल आपूर्ति बंद है",
+  "duplicate": true
+ },
+ {
+  "a": "Water is leaking from the pipe above the kitchen ceiling",
+  "b": "The kitchen ceiling pipe has a leak and water drips down",
+  "duplicate": true
+ },
+ {
+  "a": "Bathroom tap is leaking continuously",
+  "b": "बाथरूम का नल लगातार टपक रहा है",
+  "duplicate": true
+ },
+ {
+  "a": "Corridor lights on the 6th floor are not working",
+  "b": "The 6th floor passage lamps are all off",
+  "duplicate": true
+ },
+ {
+  "a": "Street light near tower 3 is out",
+  "b": "टावर 3 के पास की स्ट्रीट लाइट बंद है",
+  "duplicate": true
+ },
+ {
+  "a": "A car is blocking the entrance of tower 9",
+  "b": "Someone has parked in front of the tower 9 entrance and nobody can pass",
+  "duplicate": true
+ },
+ {
+  "a": "Someone parked a vehicle on my parking slot",
+  "b": "माझ्या पार्किंगच्या जागेवर कोणीतरी गाडी लावली आहे",
+  "duplicate": true
+ },
+ {
+  "a": "Loud music from the clubhouse every night",
+  "b": "The clubhouse plays very loud music late at night",
+  "duplicate": true
+ },
+ {
+  "a": "Construction noise early in the morning",
+  "b": "सुबह-सुबह निर्माण कार्य का बहुत शोर है",
+  "duplicate": true
+ },
+ {
+  "a": "Garbage has not been collected from our block for two days",
+  "b": "Trash in our block is lying uncollected for two days now",
+  "duplicate": true
+ },
+ {
+  "a": "The staircase is very dirty",
+  "b": "जिना खूप घाणेरडा आहे",
+  "duplicate": true
+ },
+ {
+  "a": "Sprinklers in the main garden are not working",
+  "b": "The garden sprinkler system is broken",
+  "duplicate": true
+ },
+ {
+  "a": "Gate 2 has no guard at night",
+  "b": "रात में गेट 2 पर गार्ड नहीं होता",
+  "duplicate": true
+ },
+ {
+  "a": "बिजली बार-बार जा रही है, पूरे फ्लोर पर",
+  "b": "वीज वारंवार जाते आहे, संपूर्ण मजल्यावर",
+  "duplicate": true
+ },
+ {
+  "a": "Lift door does not close properly in tower 7",
+  "b": "टावर 7 की लिफ्ट का दरवाजा ठीक से बंद नहीं होता",
+  "duplicate": true
+ },
+ {
+  "a": "Water is leaking from the terrace into the top floor flats",
+  "b": "छतावरून पाणी गळून वरच्या मजल्यावरील फ्लॅटमध्ये येत आहे",
+  "duplicate": true
+ },
+ {
+  "a": "Street dogs are scaring children in the park",
+  "b": "पार्क में आवारा कुत्ते बच्चों को डरा रहे हैं",
+  "duplicate": true
+ },
+ {
+  "a": "Lift in tower 14 is not working",
+  "b": "Lift in tower 14 makes a loud noise but still works",
+  "duplicate": false
+ },
+ {
+  "a": "Lift buttons on the 7th floor are broken",
+  "b": "The lift is very slow in the evening",
+  "duplicate": false
+ },
+ {
+  "a": "No water supply since morning",
+  "b": "Water pressure is low only on the top floor",
+  "duplicate": false
+ },
+ {
+  "a": "The water from the tap is brown and muddy",
+  "b": "No water supply since morning",
+  "duplicate": false
+ },
+ {
+  "a": "Kitchen sink is clogged and will not drain",
+  "b": "Bathroom tap is leaking continuously",
+  "duplicate": false
+ },
+ {
+  "a": "The flush tank keeps running all night",
+  "b": "Water is overflowing from the balcony drain",
+  "duplicate": false
+ },
+ {
+  "a": "Corridor light on the 5th floor is fused",
+  "b": "The MCB keeps tripping in my flat",
+  "duplicate": false
+ },
+ {
+  "a": "Meter room door is open and wires are visible",
+  "b": "Lights in the lobby flicker",
+  "duplicate": false
+ },
+ {
+  "a": "A car is parked in my slot",
+  "b": "Visitor parking is full and unavailable for guests",
+  "duplicate": false
+ },
+ {
+  "a": "Two-wheelers are parked on the ramp",
+  "b": "Parking slot numbers are faded and need repainting",
+  "duplicate": false
+ },
+ {
+  "a": "Loud music from the flat above",
+  "b": "Dogs are barking in the park all night",
+  "duplicate": false
+ },
+ {
+  "a": "Construction noise before 8 am",
+  "b": "Neighbours shout and argue late at night",
+  "duplicate": false
+ },
+ {
+  "a": "Garbage is not collected from our block",
+  "b": "The lobby floor is wet and slippery",
+  "duplicate": false
+ },
+ {
+  "a": "Dustbins near tower 4 are overflowing",
+  "b": "The stairwell windows are dirty",
+  "duplicate": false
+ },
+ {
+  "a": "The sprinklers are not working",
+  "b": "A tree branch is hanging over the walkway",
+  "duplicate": false
+ },
+ {
+  "a": "The lawn is not being mowed",
+  "b": "The children play area swings are broken",
+  "duplicate": false
+ },
+ {
+  "a": "Gate 2 has no guard at night",
+  "b": "The CCTV camera at the parking is not working",
+  "duplicate": false
+ },
+ {
+  "a": "A stranger entered without registering",
+  "b": "The intercom at the gate is not working",
+  "duplicate": false
+ },
+ {
+  "a": "लिफ्ट बंद है",
+  "b": "लिफ्ट में आवाज आती है लेकिन चल रही है",
+  "duplicate": false
+ },
+ {
+  "a": "नल से पानी टपक रहा है",
+  "b": "सिंक का पाइप जाम हो गया है",
+  "duplicate": false
+ },
+ {
+  "a": "पार्किंगमध्ये गाडी लावली आहे",
+  "b": "पार्किंगचे क्रमांक पुसले गेले आहेत",
+  "duplicate": false
+ },
+ {
+  "a": "सोसायटीच्या गेटवर सुरक्षारक्षक नाही",
+  "b": "गेटवरील कॅमेरा बंद आहे",
+  "duplicate": false
+ },
+ {
+  "a": "Garbage not collected from the staircase",
+  "b": "जिन्यातील खिडक्या खूप धुळीच्या आहेत",
+  "duplicate": false
+ }
+]
