@@ -34,8 +34,9 @@ import type { MatchKind, MatchRow } from '../matching'
  * The server speaks integer paise, upper-case enums and its own ids; everything is converted here.
  */
 
-const BASE =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:4000'
+// Production builds with no VITE_API_URL call the API on their own domain, where the host rewrites /api to the real server.
+// That keeps the session cookie first-party, which Safari and other browsers that block third-party cookies require.
+const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? (import.meta.env.PROD ? '' : 'http://localhost:4000')).replace(/\/$/, '')
 const V1 = `${BASE}/api/v1`
 const TOKEN_KEY = 'nivaas.token'
 

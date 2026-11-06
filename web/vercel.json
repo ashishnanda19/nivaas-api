@@ -1,3 +1,6 @@
 {
-  "rewrites": [{ "source": "/((?!assets/|sw\\.js|workbox-.*\\.js|manifest\\.webmanifest|.*\\..*).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://nivaas-api-qazk.onrender.com/api/:path*" },
+    { "source": "/((?!api/|assets/|sw\\.js|workbox-.*\\.js|manifest\\.webmanifest|.*\\..*).*)", "destination": "/index.html" }
+  ]
 }
