@@ -9,6 +9,8 @@ services:
     envVars:
       - { key: NODE_ENV, value: production }
       - { key: OTP_FIXED_CODE_ENABLED, value: 'false' }
+      # The seeded demo accounts accept the fixed code 123456. Every other number gets a random code.
+      - { key: DEMO_OTP_PHONES, value: '9800000001,9800000002,9800000003,9800000004,9800000010,9800000020,9800000030' }
       - { key: STORAGE_DIR, value: /data/storage }
       # Object storage keeps photos across restarts. The free plan has no persistent disk.
       - { key: S3_BUCKET, sync: false }

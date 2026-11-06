@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/lib/config.js'
+import { usesFixedCode } from '../src/modules/auth/service.js'
 
 const base = {
   NODE_ENV: 'development', DATABASE_URL: 'postgresql://x@localhost/x', JWT_SECRET: 'a'.repeat(32), JWT_REFRESH_SECRET: 'b'.repeat(32),
@@ -24,5 +25,20 @@ describe('config', () => {
   })
   it('splits the CORS allow-list', () => {
     expect(loadConfig({ ...base, CORS_ORIGINS: 'https://a.app, https://b.app' }).corsOrigins).toEqual(['https://a.app', 'https://b.app'])
+  })
+
+  describe('demo accounts in production', () => {
+    const prod = { ...base, NODE_ENV: 'production', DEMO_OTP_PHONES: '9800000001, 9800000010' }
+    it('lists the demo phones and still refuses the global fixed code', () => {
+      const c = loadConfig(prod)
+      expect([...c.demoPhones]).toEqual(['9800000001', '9800000010'])
+      expect(loadConfig({ ...base, NODE_ENV: 'production' }).demoPhones.size).toBe(0)
+      expect(() => loadConfig({ ...prod, OTP_FIXED_CODE_ENABLED: 'true' })).toThrow(/OTP_FIXED_CODE_ENABLED/)
+    })
+    it('gives the fixed code only to listed phones', () => {
+      const c = loadConfig(prod)
+      expect(usesFixedCode('9800000001', c)).toBe(true)
+      expect(usesFixedCode('9811111111', c)).toBe(false)
+    })
   })
 })

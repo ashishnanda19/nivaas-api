@@ -15,6 +15,8 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET must be at least 16 characters'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   OTP_FIXED_CODE_ENABLED: bool,
+  // Comma-separated phone numbers that accept the fixed demo code even in production (the seeded demo accounts). Empty by default.
+  DEMO_OTP_PHONES: z.string().optional().default(''),
   GEMINI_API_KEY: z.string().optional().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GROQ_API_KEY: z.string().optional().default(''),
@@ -31,7 +33,7 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
 })
 
-export type Config = z.infer<typeof schema> & { corsOrigins: string[]; isProd: boolean }
+export type Config = z.infer<typeof schema> & { corsOrigins: string[]; isProd: boolean; demoPhones: Set<string> }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env)
@@ -50,6 +52,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ...c,
     corsOrigins: c.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     isProd: c.NODE_ENV === 'production',
+    demoPhones: new Set(c.DEMO_OTP_PHONES.split(',').map((s) => s.trim()).filter(Boolean)),
   }
 }
 

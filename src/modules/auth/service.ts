@@ -19,15 +19,18 @@ export const otpRequestCap = (fixedMode: boolean) => (fixedMode ? OTP_MAX_REQUES
 
 const FIXED = '123456'
 
+/** The fixed demo code is accepted when enabled globally (non-production) or for an explicitly listed demo account. */
+export const usesFixedCode = (phone: string, cfg: Pick<typeof config, 'OTP_FIXED_CODE_ENABLED' | 'demoPhones'> = config) => cfg.OTP_FIXED_CODE_ENABLED || cfg.demoPhones.has(phone)
+
 export async function requestOtp(phone: string, sms: MessageProvider, now = new Date()) {
   const since = new Date(now.getTime() - OTP_WINDOW_MS)
   const recent = await repo.countOtpsSince(phone, since)
-  const cap = otpRequestCap(config.OTP_FIXED_CODE_ENABLED)
+  const cap = otpRequestCap(usesFixedCode(phone))
   if (recent >= cap) throw tooMany('Too many codes requested for this number. Try again in a few minutes.')
 
   const user = await repo.userByPhone(phone)
   // Same response whether or not the number is registered, so numbers cannot be enumerated.
-  const code = config.OTP_FIXED_CODE_ENABLED ? FIXED : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
+  const code = usesFixedCode(phone) ? FIXED : crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
   await repo.createOtp({ phone, codeHash: await argon2.hash(code), expiresAt: new Date(now.getTime() + OTP_TTL_MS) })
   if (user) await sms.sendSms(phone, `Your Nivaas code is ${code}. It expires in 5 minutes.`)
   return { sent: true, expiresInSec: OTP_TTL_MS / 1000 }

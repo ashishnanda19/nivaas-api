@@ -43,7 +43,7 @@ Free tiers sleep when idle, so the first request after a pause is slow. For real
 
 ## Demo logins
 
-Sign in with the phone number; the demo OTP is **123456** while `OTP_FIXED_CODE_ENABLED=true`.
+Sign in with the phone number and the demo OTP **123456**. Locally this works for every number while `OTP_FIXED_CODE_ENABLED=true`. In production that flag is refused, so only the phones listed in `DEMO_OTP_PHONES` (the seven accounts below) accept the fixed code. Any other number gets a random, hashed, 5-minute code, and no SMS provider is connected (the console provider logs that a message was sent, never the code).
 
 | Role | Phone | Who |
 | --- | --- | --- |
