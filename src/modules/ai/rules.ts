@@ -27,8 +27,9 @@ const SAFETY: Record<SafetyKind, RegExp[]> = {
   ],
   electric: [
     /\b(electric(al)?\s*shock|electrocut\w*|got\s*a\s*shock|short[\s-]*circuit|sparking|sparks?|live wire|wire\s*(fell|hanging)|current\s*(in|leak)\w*)\b/i,
-    /बिजली\s*का\s*झटका|विजेचा\s*धक्का|करंट|शॉर्ट\s*सर्किट|शॉर्टसर्किट|चिंगारी|ठिणग्या|तार\s*(गिर|तुट|तूट)/,
-    /\b(bijli\s*ka\s*jhatka|current\s*laga|short\s*circuit)\b/i,
+    /\b(getting|get|gets|got|received|receiving)\s+(a\s+|some\s+)?(small\s+|mild\s+)?shocks?\b|\bshocks?\s+(from|by)\s+(the\s+)?(water\s+)?(switch|socket|wire|plug|board|tap|geyser|fan|light|iron|fridge|meter)\b/i,
+    /बिजली\s*का\s*झटका|विजेचा\s*धक्का|करंट|शॉक\s*(लग\w*|लाग\w*|बस\w*|मार\w*)|(बिजली|वीज|विजेचा|विजेचे)\s*(का\s*|की\s*)?शॉक|शॉर्ट\s*सर्किट|शॉर्टसर्किट|चिंगारी|ठिणग्या|तार\s*(गिर|तुट|तूट)/,
+    /\b(bijli\s*ka\s*jhatka|current\s*laga|short\s*circuit|(shock|jhatka|jhatke)\s*(laga|lag|lagta|lagla|basla|baisla|mara))\b/i,
   ],
   flood: [
     /\b(flood|flooded|flooding|water\s*logging|waterlogging|water\s*(is\s*)?(entering|gushing)|pipe\s*burst|burst\s*pipe)\b/i,

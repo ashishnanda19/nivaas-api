@@ -25,6 +25,9 @@ describe('safety words win over the model', () => {
     ['en lift', 'My mother is stuck in the lift between floors 8 and 9'],
     ['en lift2', 'Lift stuck, people trapped inside'],
     ['en shock', 'My son got an electric shock from the switch board'],
+    ['en shocks repeatedly', 'I keep getting shocks from the geyser'],
+    ['en shock from', 'Shock from the water tap in the kitchen'],
+    ['roman shock', 'Switch se shock laga hai, jaldi aao'],
     ['en short', 'Short circuit in the meter room, sparks flying'],
     ['en flood', 'Flooding in the ground floor lobby, pipe burst'],
     ['en collapse', 'Part of the ceiling fell in the stairwell, slab cracked'],
@@ -32,12 +35,16 @@ describe('safety words win over the model', () => {
     ['hi gas', 'रसोई के पास गैस की बदबू आ रही है'],
     ['hi lift', 'लिफ्ट में फंस गए हैं, मदद करें'],
     ['hi shock', 'स्विच बोर्ड से बिजली का झटका लगा'],
+    ['hi shock loanword', 'बिजली का शॉक लग रहा है स्विच बोर्ड से'],
+    ['hi shock child', 'बच्चे को स्विच से शॉक लगा'],
     ['hi flood', 'लॉबी में पानी भर गया है'],
     ['hi roman', 'Gas leak ho raha hai, lift mein fas gaya hu'],
     ['mr fire', 'पार्किंगमध्ये आग लागली आहे'],
     ['mr gas', 'स्वयंपाकघराजवळ गॅसचा वास येतोय'],
     ['mr lift', 'लिफ्टमध्ये अडकले आहे, कृपया मदत करा'],
     ['mr shock', 'स्विचमधून विजेचा धक्का बसला'],
+    ['mr shock loanword', 'स्विचमधून शॉक बसला'],
+    ['mr shock 2', 'विजेचा शॉक लागला, लगेच या'],
     ['mr collapse', 'जिन्यातील भिंत कोसळली'],
     ['mr flood', 'तळमजल्यावर पाणी साचले, पाईप फुटला'],
   ]
@@ -72,7 +79,7 @@ describe('safety words win over the model', () => {
   })
 
   it('does not escalate ordinary complaints', async () => {
-    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है', 'लिफ्ट बंद है', 'Lift not working in tower 14, display shows the wrong floor', 'Fixed asset register needs updating'])
+    for (const t of ['The garden lights are not working', 'Water tap dripping in bathroom', 'बगीचे की लाइट बंद है', 'लिफ्ट बंद है', 'Lift not working in tower 14, display shows the wrong floor', 'Fixed asset register needs updating', 'The new maintenance rates are shocking', 'Shock absorber of the main gate is broken', 'शोक सभा की सूचना लगाएं', 'लिफ्ट में झटके लगते हैं'])
       expect(detectSafety(t)).toBeNull()
   })
 })
