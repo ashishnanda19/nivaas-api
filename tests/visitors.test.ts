@@ -168,7 +168,7 @@ describe('photo retention (DPDP)', () => {
 })
 
 describe('pre-approved guests', () => {
-  const today = () => new Date().toISOString().slice(0, 10)
+  const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10) // today in India, which is what the API uses
   const make = async (token = neeraj, flatId = 'T07-1203', date = today()) => call('POST', '/pre-approvals', token, { flatId, guestName: 'Aunty Sharma', date })
 
   it('creates a 6 digit code, stores only its hash', async () => {
