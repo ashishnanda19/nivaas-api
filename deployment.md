@@ -64,3 +64,12 @@ Useful things to try:
 - Tower 14 has a cluster of ten lift complaints linked under one.
 - As a guard, verify the pre-approval code **482913** (for T07-1203, valid today).
 - As a resident, pay a bill through the test gateway, then download the receipt.
+
+## Dependency audit notes
+
+`npm audit` reports four high advisories. None is fixed without a major upgrade, so they are recorded here instead of forced.
+
+- `zod` (GHSA-mrhx-c7xc-m3w5): memory use when validating very large constrained collections. The fix is zod 4, which also needs a replacement for `zod-to-json-schema` used by the OpenAPI builder. Exposure is limited because Fastify caps request bodies (1 MB by default, 2 to 20 MB on upload routes) and every route is rate limited. Plan: migrate to zod 4 as its own change.
+- `deepmerge-ts` via `prisma` and `@prisma/config` (GHSA-ggr8-5vv4-36mx): this is in the Prisma CLI, a dev dependency used for migrations and generate. It never handles user input at runtime. The fix is a Prisma 7 upgrade, a separate change.
+
+Re-run `npm audit` before each release.
