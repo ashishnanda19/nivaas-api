@@ -21,6 +21,13 @@ const schema = z.object({
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8),
   STORAGE_DIR: z.string().default('./storage'),
+  // S3-compatible object storage (Supabase Storage, Cloudflare R2, AWS S3, MinIO). Leave S3_BUCKET empty to use local disk.
+  S3_BUCKET: z.string().optional().default(''),
+  S3_ENDPOINT: z.string().optional().default(''),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_ACCESS_KEY_ID: z.string().optional().default(''),
+  S3_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  S3_FORCE_PATH_STYLE: bool,
   LOG_LEVEL: z.string().default('info'),
 })
 
@@ -38,6 +45,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (/change-me/.test(c.JWT_SECRET + c.JWT_REFRESH_SECRET + c.PAYMENT_WEBHOOK_SECRET))
       throw new Error('Placeholder secrets are not allowed in production')
   }
+  if (c.S3_BUCKET && (!c.S3_ACCESS_KEY_ID || !c.S3_SECRET_ACCESS_KEY)) throw new Error('S3_BUCKET is set but S3_ACCESS_KEY_ID or S3_SECRET_ACCESS_KEY is missing')
   return {
     ...c,
     corsOrigins: c.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),

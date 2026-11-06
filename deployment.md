@@ -73,3 +73,11 @@ Useful things to try:
 - `deepmerge-ts` via `prisma` and `@prisma/config` (GHSA-ggr8-5vv4-36mx): this is in the Prisma CLI, a dev dependency used for migrations and generate. It never handles user input at runtime. The fix is a Prisma 7 upgrade, a separate change.
 
 Re-run `npm audit` before each release.
+
+## File storage
+
+Complaint and visitor photos go through a storage interface. With no `S3_BUCKET` they are written to `STORAGE_DIR` on local disk, which is lost on restart on hosts without a persistent disk (Render free plan). Set the `S3_*` variables to use any S3-compatible bucket instead; the bucket must be private, because the API serves photos itself through short-lived signed links.
+
+Supabase Storage: create a private bucket (Storage, New bucket), then Storage, S3 Connection, to find the endpoint and region and to create an access key. Use `S3_FORCE_PATH_STYLE=true`.
+
+`tests/storage.s3.test.ts` runs against any S3-compatible server when `S3_TEST_ENDPOINT` is set (it is skipped otherwise).

@@ -10,6 +10,13 @@ services:
       - { key: NODE_ENV, value: production }
       - { key: OTP_FIXED_CODE_ENABLED, value: 'false' }
       - { key: STORAGE_DIR, value: /data/storage }
+      # Object storage keeps photos across restarts. The free plan has no persistent disk.
+      - { key: S3_BUCKET, sync: false }
+      - { key: S3_ENDPOINT, sync: false }
+      - { key: S3_REGION, sync: false }
+      - { key: S3_ACCESS_KEY_ID, sync: false }
+      - { key: S3_SECRET_ACCESS_KEY, sync: false }
+      - { key: S3_FORCE_PATH_STYLE, value: 'true' }
       - { key: DATABASE_URL, sync: false }
       - { key: REDIS_URL, sync: false }
       - { key: CORS_ORIGINS, sync: false }

@@ -1,3 +1,4 @@
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -39,7 +40,49 @@ export class LocalStorage implements Storage {
   }
 }
 
-export const storage: Storage = new LocalStorage(config.STORAGE_DIR)
+const MIME: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
+
+/** S3-compatible object storage. Keys have the same shape as LocalStorage, so a deployment can switch without migrating rows. */
+export class S3Storage implements Storage {
+  constructor(private client: S3Client, private bucket: string) {}
+
+  private check(key: string) {
+    if (!/^[a-z0-9_-]+\/[a-f0-9-]{36}\.[a-z0-9]+$/i.test(key)) throw badRequest('Bad file path')
+    return key
+  }
+  async put(folder: string, data: Buffer, ext: string) {
+    const safeExt = ext.replace(/[^a-z0-9]/gi, '')
+    const key = `${folder.replace(/[^a-z0-9_-]/gi, '')}/${crypto.randomUUID()}.${safeExt}`
+    await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data, ContentType: MIME[safeExt.toLowerCase()] ?? 'application/octet-stream' }))
+    return key
+  }
+  async get(key: string) {
+    try {
+      const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.check(key) }))
+      return res.Body ? Buffer.from(await res.Body.transformToByteArray()) : null
+    } catch (e) {
+      const name = (e as { name?: string }).name
+      if (name === 'NoSuchKey' || name === 'NotFound') return null
+      throw e
+    }
+  }
+  async delete(key: string) {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.check(key) }))
+  }
+}
+
+export function createStorage(c: Pick<typeof config, 'STORAGE_DIR' | 'S3_BUCKET' | 'S3_ENDPOINT' | 'S3_REGION' | 'S3_ACCESS_KEY_ID' | 'S3_SECRET_ACCESS_KEY' | 'S3_FORCE_PATH_STYLE'>): Storage {
+  if (!c.S3_BUCKET) return new LocalStorage(c.STORAGE_DIR)
+  const client = new S3Client({
+    region: c.S3_REGION,
+    ...(c.S3_ENDPOINT ? { endpoint: c.S3_ENDPOINT } : {}),
+    forcePathStyle: c.S3_FORCE_PATH_STYLE,
+    credentials: { accessKeyId: c.S3_ACCESS_KEY_ID, secretAccessKey: c.S3_SECRET_ACCESS_KEY },
+  })
+  return new S3Storage(client, c.S3_BUCKET)
+}
+
+export const storage: Storage = createStorage(config)
 
 export type ImageType = { ext: 'jpg' | 'png' | 'webp'; mime: string }
 
