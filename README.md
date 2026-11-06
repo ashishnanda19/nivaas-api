@@ -2,7 +2,7 @@
 
 Backend for Nivaas, a resident app and operations console for a gated township (2,400 flats in 28 towers). One deployable modular monolith: Fastify, TypeScript, PostgreSQL with Prisma, optional Redis for background jobs.
 
-The React front end lives in a separate repository and talks to this API under `/api/v1`.
+The React front end lives in [`web/`](web/) in this repository and talks to this API under `/api/v1`. See [`web/README.md`](web/README.md) to run it, and set `VITE_USE_MOCK=false` and `VITE_API_URL` to point it at a running API.
 
 ## Quick start
 
