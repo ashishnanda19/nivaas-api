@@ -106,6 +106,10 @@ API:
 | `CORS_ORIGINS` | yes | comma separated list of allowed web origins |
 | `OTP_FIXED_CODE_ENABLED` | no | development only; refused in production |
 | `DEMO_OTP_PHONES` | no | comma separated phones that accept the fixed demo code, also in production |
+| `SMS_PROVIDER` | no | `console` (default, delivers nothing) or `twilio` |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` or `TWILIO_MESSAGING_SERVICE_SID` | with `twilio` | Twilio credentials and the number or service to send from |
+| `SMS_ALLOWED_PHONES` | with `twilio` | comma separated numbers that may receive messages. A real provider refuses to start without it unless `SMS_ALLOW_ALL=true` |
+| `SMS_ALLOW_ALL`, `SMS_DEFAULT_COUNTRY_CODE` | no | lift the allow-list on purpose; country code added to 10 digit numbers (default 91) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | no | primary model (default `gemini-2.5-flash-lite`). A free Gemini key allows only about 20 requests per model per day, after which Groq answers, so keep both keys set. Without keys the app runs on its rules classifier |
 | `GROQ_API_KEY`, `GROQ_MODEL` | no | fallback model |
 | `STORAGE_DRIVER`, `STORAGE_DIR` | no | `local` (default) or `db` for hosts with no persistent disk |
@@ -121,6 +125,18 @@ Web:
 | `VITE_API_URL` | base URL of the API at build time. Leave it unset in production (the app then uses its own domain, see above). In development set `http://localhost:4000` |
 
 `.env` files are gitignored; only `.env.example` files are committed.
+
+## Text messages
+
+Sign-in codes and payment reminders go through one `MessageProvider`. With `SMS_PROVIDER=console` (the default) a message is only logged and nothing is delivered. With `SMS_PROVIDER=twilio` it is delivered by Twilio's REST API.
+
+Safety rules for a real provider:
+
+- Nothing is texted unless the number is in `SMS_ALLOWED_PHONES` (or `SMS_ALLOW_ALL=true` was set on purpose). The server refuses to start with a real provider and neither, so seeded or test numbers can never be texted by accident.
+- The seven demo accounts are never texted, whatever else is allowed. Generated resident numbers in the seed start with 5, which no mobile operator issues.
+- A message that is held back shows as "Not sent" in the Reminders page, and is sent on a later run once the number is allowed. A failure shows as "Failed" and is retried. A failure to send a sign-in code does not change the reply to the user, so it cannot reveal which numbers are registered.
+
+Twilio trial accounts can only text numbers verified in the Twilio console, which suits a demo. Sending to Indian numbers at scale needs the operator's DLT registration of the sender and each message template, which is an administrative step outside this code and takes days. The message texts are in `src/modules/reminders/messages.ts` and `src/modules/auth/service.ts` and would be registered as templates.
 
 ## Evaluations
 
