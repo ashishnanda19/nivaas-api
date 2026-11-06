@@ -492,3 +492,28 @@ model StoredFile {
   data      Bytes
   createdAt DateTime @default(now())
 }
+
+enum ReminderKind {
+  BEFORE_DUE
+  ON_DUE
+  OVERDUE
+}
+
+/// One payment reminder sent to one person for one bill. The unique key is what keeps the daily job from sending twice.
+model Reminder {
+  id        String       @id @default(cuid())
+  billId    String
+  flatId    String
+  userId    String
+  period    String
+  kind      ReminderKind
+  language  String
+  phone     String
+  message   String
+  status    String       @default("SENT") // SENT or FAILED
+  sentAt    DateTime     @default(now())
+
+  @@unique([billId, userId, kind])
+  @@index([sentAt])
+  @@index([flatId])
+}
