@@ -104,7 +104,14 @@ export function App() {
             }
           >
             <Route index element={<Navigate to="complaints" replace />} />
-            <Route path="complaints" element={<Board />} />
+            <Route
+              path="complaints"
+              element={
+                <RequireRole roles={['helpdesk']}>
+                  <Board />
+                </RequireRole>
+              }
+            />
             <Route
               path="payments"
               element={
@@ -113,7 +120,14 @@ export function App() {
                 </RequireRole>
               }
             />
-            <Route path="billing" element={<Billing />} />
+            <Route
+              path="billing"
+              element={
+                <RequireRole roles={['helpdesk']}>
+                  <Billing />
+                </RequireRole>
+              }
+            />
             <Route
               path="visitors"
               element={

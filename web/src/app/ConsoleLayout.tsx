@@ -24,9 +24,9 @@ import { useTranslation } from 'react-i18next'
 
 const ALL = [
   { to: '/console/dashboard', label: 'Dashboard', icon: BarChart3, roles: ['committee'] },
-  { to: '/console/complaints', label: 'Complaints', icon: MessageSquare, roles: ['helpdesk', 'committee'] },
+  { to: '/console/complaints', label: 'Complaints', icon: MessageSquare, roles: ['helpdesk'] },
   { to: '/console/payments', label: 'Payments', icon: Landmark, roles: ['helpdesk'] },
-  { to: '/console/billing', label: 'Billing', icon: Receipt, roles: ['helpdesk', 'committee'] },
+  { to: '/console/billing', label: 'Billing', icon: Receipt, roles: ['helpdesk'] },
   { to: '/console/visitors', label: 'Visitors', icon: Users, roles: ['helpdesk'] },
   { to: '/console/bookings', label: 'Amenity bookings', icon: CalendarDays, roles: ['helpdesk'] },
   { to: '/console/reminders', label: 'Reminders', icon: BellRing, roles: ['helpdesk', 'committee'] },
