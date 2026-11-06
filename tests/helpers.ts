@@ -87,3 +87,20 @@ export async function login(app: FastifyInstance, phone: string): Promise<string
 }
 
 export const auth = (token: string) => ({ authorization: `Bearer ${token}` })
+
+/** Build a multipart/form-data body by hand so tests need no extra dependency. */
+export function multipart(filename: string, content: string, contentType = 'text/csv') {
+  const boundary = '----nivaas' + Math.random().toString(16).slice(2)
+  const payload = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n${content}\r\n--${boundary}--\r\n`
+  return { payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } }
+}
+
+export const SAMPLE_CSV = [
+  'Date,Amount,Reference,UPI ID,Narration',
+  '05/11/2026,"6,370.00",UPI/T12-0408/MAINT,swati.j@ybl,Maintenance',
+  '05/11/2026,"6,370.00",UPI/T12-0408/MAINT,swati.j@ybl,Maintenance',
+  '05/11/2026,3000,T12-0408 PART,,Part payment',
+  '06/11/2026,"21,320.00",MAINT T21-1601 2 MONTHS,,Two months',
+  '06/11/2026,43.21,NEFT 88231,unknown.person@ybl,Transfer',
+  '06/11/2026,"7,475.00",UPI/T07-1203/MAINT,neeraj.k@okaxis,Maintenance',
+].join('\n')
