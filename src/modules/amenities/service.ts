@@ -4,6 +4,7 @@ import { logger } from '../../lib/logger.js'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
 import { isOps, type AuthUser } from '../../lib/auth.js'
 import { writeAudit, type Actor } from '../audit/service.js'
+import { amenityRepo as repo } from './repo.js'
 
 export const MAX_DAYS_AHEAD = 30
 export const MAX_UPCOMING_PER_FLAT = 4
@@ -27,14 +28,13 @@ function slotStarts(a: Pick<Amenity, 'openFrom' | 'openTo' | 'slotMinutes'>): nu
   return out
 }
 
-export const listAmenities = async () => (await prisma.amenity.findMany({ orderBy: { name: 'asc' } })).map(amenityView)
+export const listAmenities = async () => (await repo.list()).map(amenityView)
 
 export async function availability(amenityId: string, date: string, now = new Date()) {
-  const a = await prisma.amenity.findUnique({ where: { id: amenityId } })
+  const a = await repo.byId(amenityId)
   if (!a) throw notFound('Amenity not found')
   const dayStart = istInstant(date, '00:00')
-  const dayEnd = new Date(dayStart.getTime() + 86400000)
-  const booked = await prisma.amenityBooking.findMany({ where: { amenityId, status: 'CONFIRMED', startsAt: { gte: dayStart, lt: dayEnd } } })
+  const booked = await repo.confirmedOnDay(amenityId, dayStart)
   const taken = new Set(booked.map((b) => b.startsAt.getTime()))
   return {
     amenityId, date,
@@ -54,7 +54,7 @@ const bookingView = (b: AmenityBooking & { amenity: Amenity }) => ({
 const istInstantTime = (d: Date) => new Date(d.getTime() + 5.5 * 3600e3).toISOString().slice(11, 16)
 
 export async function book(user: AuthUser, actor: Actor, b: { amenityId: string; flatId: string; date: string; start: string }, now = new Date()) {
-  const a = await prisma.amenity.findUnique({ where: { id: b.amenityId } })
+  const a = await repo.byId(b.amenityId)
   if (!a) throw notFound('Amenity not found')
   const starts = slotStarts(a)
   if (!starts.includes(mins(b.start))) throw badRequest(`Slots start at ${starts.map(hhmm).join(', ')}`)
@@ -65,16 +65,13 @@ export async function book(user: AuthUser, actor: Actor, b: { amenityId: string;
   if (startsAt.getTime() - now.getTime() > MAX_DAYS_AHEAD * 86400000) throw badRequest(`Bookings open ${MAX_DAYS_AHEAD} days ahead`)
 
   const dayStart = istInstant(b.date, '00:00')
-  const sameDay = await prisma.amenityBooking.count({ where: { amenityId: a.id, flatId: b.flatId, status: 'CONFIRMED', startsAt: { gte: dayStart, lt: new Date(dayStart.getTime() + 86400000) } } })
+  const sameDay = await repo.countFlatOnDay(a.id, b.flatId, dayStart)
   if (sameDay >= 1) throw conflict('Your flat already has a booking for this amenity that day')
-  const upcoming = await prisma.amenityBooking.count({ where: { flatId: b.flatId, status: 'CONFIRMED', startsAt: { gt: now } } })
+  const upcoming = await repo.countFlatUpcoming(b.flatId, now)
   if (upcoming >= MAX_UPCOMING_PER_FLAT) throw conflict(`A flat can hold ${MAX_UPCOMING_PER_FLAT} upcoming bookings at a time`)
 
   try {
-    const row = await prisma.amenityBooking.create({
-      data: { amenityId: a.id, flatId: b.flatId, startsAt, endsAt, feePaise: a.feePaise, createdBy: user.id },
-      include: { amenity: true },
-    })
+    const row = await repo.create({ amenityId: a.id, flatId: b.flatId, startsAt, endsAt, feePaise: a.feePaise, createdBy: user.id })
     if (isOps(user)) await writeAudit(prisma, actor, { action: 'booking.create', entity: 'AmenityBooking', entityId: row.id, after: { flatId: b.flatId, date: b.date, start: b.start }, detail: 'Booked on behalf of a flat' })
     return bookingView(row)
   } catch (e) {
@@ -88,11 +85,11 @@ export async function book(user: AuthUser, actor: Actor, b: { amenityId: string;
 }
 
 export async function cancel(user: AuthUser, actor: Actor, id: string, now = new Date()) {
-  const b = await prisma.amenityBooking.findUnique({ where: { id }, include: { amenity: true } })
+  const b = await repo.bookingById(id)
   if (!b || (!isOps(user) && !user.flatIds.includes(b.flatId))) throw notFound('Booking not found')
   if (b.status === 'CANCELLED') return bookingView(b)
   if (!isOps(user) && b.startsAt.getTime() - now.getTime() < CANCEL_NOTICE_MS) throw forbidden('Bookings can be cancelled up to 2 hours before the slot. Call the help desk.')
-  const u = await prisma.amenityBooking.update({ where: { id }, data: { status: 'CANCELLED' }, include: { amenity: true } })
+  const u = await repo.cancel(id)
   if (isOps(user)) await writeAudit(prisma, actor, { action: 'booking.cancel', entity: 'AmenityBooking', entityId: id, before: { status: b.status } })
   return bookingView(u)
 }
@@ -105,9 +102,6 @@ export async function listBookings(user: AuthUser, q: { flatId?: string; amenity
     ...(q.includeCancelled ? {} : { status: 'CONFIRMED' as const }),
     ...(day ? { startsAt: { gte: day, lt: new Date(day.getTime() + 86400000) } } : {}),
   }
-  const [rows, total] = await Promise.all([
-    prisma.amenityBooking.findMany({ where, include: { amenity: true }, orderBy: { startsAt: 'asc' }, skip: q.skip, take: q.take }),
-    prisma.amenityBooking.count({ where }),
-  ])
+  const [rows, total] = await repo.page(where, q.skip, q.take)
   return { total, items: rows.map(bookingView) }
 }
