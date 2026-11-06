@@ -125,6 +125,8 @@ model Society {
   lateFeeFlatPaise Int    @default(0)
   // basis points per month, 175 = 1.75 % per month, simple interest pro rata by day
   lateFeeMonthlyBp Int    @default(175)
+  // minutes to first response per urgency
+  slaMinutes     Json     @default("{\"CRITICAL\":15,\"HIGH\":120,\"NORMAL\":480,\"LOW\":1440}")
   towers         Tower[]
 }
 

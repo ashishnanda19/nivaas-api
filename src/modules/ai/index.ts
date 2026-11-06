@@ -8,3 +8,6 @@ export function aiMode(): 'gemini+groq+rules' | 'gemini+rules' | 'groq+rules' | 
   if (q) return 'groq+rules'
   return 'rules-only'
 }
+
+export { classifyComplaint, type Classification } from './classify.js'
+export { defaultClients, type LlmClient } from './llm.js'
