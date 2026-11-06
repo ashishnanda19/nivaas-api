@@ -1,5 +1,6 @@
 import type { Amenity, AmenityBooking } from '@prisma/client'
 import { prisma } from '../../lib/db.js'
+import { logger } from '../../lib/logger.js'
 import { badRequest, conflict, forbidden, notFound } from '../../lib/errors.js'
 import { isOps, type AuthUser } from '../../lib/auth.js'
 import { writeAudit, type Actor } from '../audit/service.js'
@@ -78,7 +79,10 @@ export async function book(user: AuthUser, actor: Actor, b: { amenityId: string;
     return bookingView(row)
   } catch (e) {
     // The database exclusion constraint is the final word: two people clicking the same slot cannot both win.
-    if (/AmenityBooking_no_overlap|exclusion|23P01/.test(String((e as Error).message) + String((e as { code?: string }).code))) throw conflict('That slot was just taken')
+    // A deadlock between simultaneous inserts also means someone else got there first; nothing was written.
+    const text = String((e as Error).message) + String((e as { code?: string }).code)
+    if (/AmenityBooking_no_overlap|exclusion|23P01|deadlock|40P01|P2034/i.test(text)) throw conflict('That slot was just taken')
+    logger.error({ code: (e as { code?: string }).code, err: (e as Error).message.slice(0, 300) }, 'unexpected booking error')
     throw e
   }
 }
