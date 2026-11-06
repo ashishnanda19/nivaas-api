@@ -4,6 +4,12 @@ import type { ZodTypeAny } from 'zod'
 import * as authS from '../modules/auth/schema.js'
 import * as cS from '../modules/complaints/schema.js'
 import * as vS from '../modules/visitors/schema.js'
+import { memberBody } from '../modules/flats/routes.js'
+import { postRowBody, rejectBody } from '../modules/matching/routes.js'
+import { gatewayBody, intentBody, webhookBody } from '../modules/payments/routes.js'
+import { reverseBody, runBody } from '../modules/billing/routes.js'
+import { noticeBody } from '../modules/notices/routes.js'
+import { bookBody } from '../modules/amenities/routes.js'
 
 /**
  * OpenAPI document built from the real route table (so paths cannot drift) plus the Zod schemas the
@@ -22,6 +28,16 @@ const BODIES: Record<string, ZodTypeAny> = {
   'POST /api/v1/complaints/:code/status': cS.statusBody,
   'POST /api/v1/complaints/:code/rating': cS.ratingBody,
   'POST /api/v1/complaints/:code/link': cS.linkBody,
+  'POST /api/v1/flats/:id/members': memberBody,
+  'POST /api/v1/matching/rows/:id/post': postRowBody,
+  'POST /api/v1/matching/rows/:id/reject': rejectBody,
+  'POST /api/v1/payments/intents': intentBody,
+  'POST /api/v1/gateway/pay/:id': gatewayBody,
+  'POST /api/v1/payments/webhook': webhookBody,
+  'POST /api/v1/billing/runs': runBody,
+  'POST /api/v1/billing/ledger/:id/reverse': reverseBody,
+  'POST /api/v1/notices': noticeBody,
+  'POST /api/v1/amenity-bookings': bookBody,
   'POST /api/v1/visitors': vS.entry,
   'POST /api/v1/visitors/sync': vS.syncBody,
   'POST /api/v1/visitors/:id/decision': vS.decisionBody,

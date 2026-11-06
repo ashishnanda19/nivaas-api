@@ -7,7 +7,7 @@ import { pageArgs, pageQuery } from '../../lib/pagination.js'
 import { parse } from '../../lib/validate.js'
 import { writeAudit } from '../audit/service.js'
 
-const body = z.object({ title: z.string().trim().min(3).max(120), body: z.string().trim().min(3).max(4000) }).strict()
+export const noticeBody = z.object({ title: z.string().trim().min(3).max(120), body: z.string().trim().min(3).max(4000) }).strict()
 const view = (n: { id: string; title: string; body: string; createdAt: Date }) => ({ id: n.id, title: n.title, body: n.body, at: n.createdAt.toISOString() })
 
 export async function noticeRoutes(app: FastifyInstance) {
@@ -18,7 +18,7 @@ export async function noticeRoutes(app: FastifyInstance) {
   })
 
   app.post('/notices', { preHandler: guard({ roles: OPS }) }, async (req) => {
-    const n = await prisma.notice.create({ data: parse(body, req.body) })
+    const n = await prisma.notice.create({ data: parse(noticeBody, req.body) })
     await writeAudit(prisma, actorOf(req), { action: 'notice.create', entity: 'Notice', entityId: n.id, after: { title: n.title } })
     return view(n)
   })

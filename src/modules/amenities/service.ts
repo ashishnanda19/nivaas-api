@@ -52,7 +52,7 @@ const bookingView = (b: AmenityBooking & { amenity: Amenity }) => ({
 })
 const istInstantTime = (d: Date) => new Date(d.getTime() + 5.5 * 3600e3).toISOString().slice(11, 16)
 
-export async function book(user: AuthUser, b: { amenityId: string; flatId: string; date: string; start: string }, now = new Date()) {
+export async function book(user: AuthUser, actor: Actor, b: { amenityId: string; flatId: string; date: string; start: string }, now = new Date()) {
   const a = await prisma.amenity.findUnique({ where: { id: b.amenityId } })
   if (!a) throw notFound('Amenity not found')
   const starts = slotStarts(a)
@@ -74,6 +74,7 @@ export async function book(user: AuthUser, b: { amenityId: string; flatId: strin
       data: { amenityId: a.id, flatId: b.flatId, startsAt, endsAt, feePaise: a.feePaise, createdBy: user.id },
       include: { amenity: true },
     })
+    if (isOps(user)) await writeAudit(prisma, actor, { action: 'booking.create', entity: 'AmenityBooking', entityId: row.id, after: { flatId: b.flatId, date: b.date, start: b.start }, detail: 'Booked on behalf of a flat' })
     return bookingView(row)
   } catch (e) {
     // The database exclusion constraint is the final word: two people clicking the same slot cannot both win.

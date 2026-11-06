@@ -54,6 +54,11 @@ describe('openapi docs', () => {
     const body = doc.paths['/api/v1/complaints'].post.requestBody.content['application/json'].schema
     expect(body.properties.text.minLength).toBe(10)
     expect(body.additionalProperties).toBe(false)
+    for (const [path, method] of [
+      ['/api/v1/payments/intents', 'post'], ['/api/v1/matching/rows/{id}/post', 'post'], ['/api/v1/billing/runs', 'post'],
+      ['/api/v1/flats/{id}/members', 'post'], ['/api/v1/amenity-bookings', 'post'], ['/api/v1/notices', 'post'], ['/api/v1/payments/webhook', 'post'],
+    ])
+      expect(doc.paths[path][method].requestBody.content['application/json'].schema.additionalProperties, `${method} ${path}`).toBe(false)
     expect(doc.paths['/api/v1/auth/otp/request'].post.security).toBeUndefined()
     expect(doc.paths['/api/v1/billing/bill'].get.security).toEqual([{ bearer: [] }])
     expect((await app.inject({ method: 'GET', url: '/docs' })).statusCode).toBeLessThan(400)

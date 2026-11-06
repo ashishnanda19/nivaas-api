@@ -259,3 +259,17 @@ describe('overdue job', () => {
     expect((await markOverdue()).marked).toBe(0)
   })
 })
+
+describe('audit of staff access', () => {
+  it('logs staff comments and staff opening a resident complaint, but not the resident reading their own', async () => {
+    const c = (await create(swati, 'T12-0408', 'Water is leaking from the tap in the bathroom')).json()
+    await call('GET', `/complaints/${c.id}`, swati)
+    expect(await prisma.auditLog.count({ where: { action: 'pii.view' } })).toBe(0)
+    await call('GET', `/complaints/${c.id}`, hd)
+    expect(await prisma.auditLog.count({ where: { action: 'pii.view', entity: 'Complaint', entityId: c.id } })).toBe(1)
+    await call('POST', `/complaints/${c.id}/comments`, swati, { text: 'Any news?' })
+    expect(await prisma.auditLog.count({ where: { action: 'complaint.comment' } })).toBe(0)
+    await call('POST', `/complaints/${c.id}/comments`, hd, { text: 'On it' })
+    expect(await prisma.auditLog.count({ where: { action: 'complaint.comment' } })).toBe(1)
+  })
+})

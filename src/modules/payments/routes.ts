@@ -8,7 +8,7 @@ import { prisma } from '../../lib/db.js'
 import * as svc from './service.js'
 import { renderReceipt } from './receipt.js'
 
-const intentBody = z
+export const intentBody = z
   .object({
     flatId: z.string().min(3).max(12),
     amountPaise: z.number().int().positive(),
@@ -21,6 +21,9 @@ declare module 'fastify' {
     rawBody?: string
   }
 }
+
+export const gatewayBody = z.object({ outcome: z.enum(['success', 'failure']) }).strict()
+export const webhookBody = z.object({ paymentId: z.string(), status: z.enum(['success', 'failure']), gatewayRef: z.string().optional() }).strict()
 
 export async function paymentRoutes(app: FastifyInstance) {
   const g = { preHandler: guard({ roles: ['RESIDENT', 'HELPDESK'] }) }
@@ -35,7 +38,7 @@ export async function paymentRoutes(app: FastifyInstance) {
   // Test-mode gateway: the signed payload goes through the same handler a real gateway webhook would use.
   app.post('/gateway/pay/:id', g, async (req) => {
     const { id } = req.params as { id: string }
-    const { outcome } = parse(z.object({ outcome: z.enum(['success', 'failure']) }).strict(), req.body)
+    const { outcome } = parse(gatewayBody, req.body)
     const pay = await svc.getPayment(id)
     assertFlatAccess(req.user!, pay.flatId)
     const payload = JSON.stringify({ paymentId: id, status: outcome, gatewayRef: pay.reference })
@@ -50,7 +53,7 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   app.post('/payments/webhook', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     if (!svc.verifySignature(req.rawBody ?? '', req.headers['x-signature'] as string | undefined)) throw forbidden('Bad signature')
-    const b = parse(z.object({ paymentId: z.string(), status: z.enum(['success', 'failure']), gatewayRef: z.string().optional() }).strict(), req.body)
+    const b = parse(webhookBody, req.body)
     const r = await svc.confirmPayment(b.paymentId, b.status, b.gatewayRef)
     return { ok: true, status: r.payment.status }
   })

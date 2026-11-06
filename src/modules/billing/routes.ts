@@ -8,6 +8,8 @@ import * as svc from './service.js'
 import { periodOk } from './service.js'
 
 const periodStr = z.string().refine(periodOk, 'period must be YYYY-MM')
+export const runBody = z.object({ period: periodStr }).strict()
+export const reverseBody = z.object({ flatId: z.string(), reason: z.string().min(3).max(200) }).strict()
 const flatQuery = z.object({ flatId: z.string().min(3).max(12) }).passthrough()
 
 export async function billingRoutes(app: FastifyInstance) {
@@ -43,13 +45,13 @@ export async function billingRoutes(app: FastifyInstance) {
   })
 
   app.post('/billing/runs', ops, async (req) => {
-    const { period } = parse(z.object({ period: periodStr }).strict(), req.body)
+    const { period } = parse(runBody, req.body)
     return svc.billRunPublish(period, actorOf(req))
   })
 
   app.post('/billing/ledger/:id/reverse', ops, async (req) => {
     const { id } = req.params as { id: string }
-    const b = parse(z.object({ flatId: z.string(), reason: z.string().min(3).max(200) }).strict(), req.body)
+    const b = parse(reverseBody, req.body)
     return svc.reverseEntry(b.flatId, id, b.reason, actorOf(req))
   })
 }

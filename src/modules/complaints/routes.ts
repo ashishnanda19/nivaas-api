@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
-import { actorOf, assertFlatAccess, guard, OPS, verifyFileToken } from '../../lib/auth.js'
+import { actorOf, assertFlatAccess, guard, isOps, OPS, verifyFileToken } from '../../lib/auth.js'
 import { badRequest, forbidden } from '../../lib/errors.js'
 import { pageArgs } from '../../lib/pagination.js'
 import { parse } from '../../lib/validate.js'
@@ -48,8 +48,12 @@ export async function complaintRoutes(app: FastifyInstance) {
     return { items: r.items, page: q.page, pageSize: q.pageSize, total: r.total }
   })
 
-  app.get('/complaints/:code', res, async (req) => svc.getComplaint(req.user!, code(req)))
-  app.post('/complaints/:code/comments', res, async (req) => svc.addComment(req.user!, code(req), parse(s.commentBody, req.body).text))
+  app.get('/complaints/:code', res, async (req) => {
+    const c = await svc.getComplaint(req.user!, code(req))
+    if (isOps(req.user!) && !req.user!.flatIds.includes(c.flatId)) await svc.auditView(actorOf(req), c.id)
+    return c
+  })
+  app.post('/complaints/:code/comments', res, async (req) => svc.addComment(req.user!, actorOf(req), code(req), parse(s.commentBody, req.body).text))
   app.patch('/complaints/:code', res, async (req) => svc.patch(req.user!, actorOf(req), code(req), parse(s.patchBody, req.body)))
   app.post('/complaints/:code/reopen', res, async (req) => svc.reopen(req.user!, actorOf(req), code(req)))
   app.post('/complaints/:code/rating', res, async (req) => svc.rate(req.user!, code(req), parse(s.ratingBody, req.body).rating))

@@ -104,6 +104,15 @@ describe('access', () => {
   })
 })
 
+describe('audit', () => {
+  it('help desk bookings on behalf of a flat are audited, resident ones are not', async () => {
+    await book(neeraj, 'T07-1203', day(3), '18:00')
+    expect(await prisma.auditLog.count({ where: { action: 'booking.create' } })).toBe(0)
+    expect((await book(hd, 'T12-0408', day(3), '19:00')).statusCode).toBe(200)
+    expect(await prisma.auditLog.count({ where: { action: 'booking.create', role: 'HELPDESK' } })).toBe(1)
+  })
+})
+
 describe('notices', () => {
   it('everyone can read, only the help desk writes, writes are audited', async () => {
     expect((await call('POST', '/notices', neeraj, { title: 'Water cut', body: 'Tomorrow 10 to 2' })).statusCode).toBe(403)

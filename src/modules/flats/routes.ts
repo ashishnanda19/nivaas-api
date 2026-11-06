@@ -6,6 +6,8 @@ import { parse } from '../../lib/validate.js'
 import { phone } from '../auth/schema.js'
 import * as svc from './service.js'
 
+export const memberBody = z.object({ name: z.string().min(2).max(80), phone, relation: z.enum(['OWNER', 'FAMILY', 'TENANT']) }).strict()
+
 export async function flatRoutes(app: FastifyInstance) {
   const res = { preHandler: guard({ roles: ['RESIDENT', 'HELPDESK'] }) }
   const ops = { preHandler: guard({ roles: OPS }) }
@@ -32,7 +34,7 @@ export async function flatRoutes(app: FastifyInstance) {
   app.post('/flats/:id/members', res, async (req) => {
     const { id } = req.params as { id: string }
     assertFlatAccess(req.user!, id)
-    const b = parse(z.object({ name: z.string().min(2).max(80), phone, relation: z.enum(['OWNER', 'FAMILY', 'TENANT']) }).strict(), req.body)
+    const b = parse(memberBody, req.body)
     return svc.addMember(id, req.user!, actorOf(req), b)
   })
 

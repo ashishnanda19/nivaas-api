@@ -7,6 +7,9 @@ import { parse } from '../../lib/validate.js'
 import { MAX_STATEMENT_BYTES } from './csv.js'
 import * as svc from './service.js'
 
+export const postRowBody = z.object({ flatId: z.string().min(3).max(12).optional(), allowDuplicate: z.boolean().optional() }).strict()
+export const rejectBody = z.object({ reason: z.string().min(3).max(200) }).strict()
+
 export async function matchingRoutes(app: FastifyInstance) {
   const ops = { preHandler: guard({ roles: OPS }) }
 
@@ -40,12 +43,12 @@ export async function matchingRoutes(app: FastifyInstance) {
   })
 
   app.post('/matching/rows/:id/post', ops, async (req) => {
-    const b = parse(z.object({ flatId: z.string().min(3).max(12).optional(), allowDuplicate: z.boolean().optional() }).strict(), req.body ?? {})
+    const b = parse(postRowBody, req.body ?? {})
     return svc.postRow((req.params as { id: string }).id, b, actorOf(req))
   })
 
   app.post('/matching/rows/:id/reject', ops, async (req) => {
-    const b = parse(z.object({ reason: z.string().min(3).max(200) }).strict(), req.body)
+    const b = parse(rejectBody, req.body)
     return svc.rejectRow((req.params as { id: string }).id, b.reason, actorOf(req))
   })
 

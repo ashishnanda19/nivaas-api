@@ -220,12 +220,13 @@ export async function photoFor(code: string) {
 
 // ---- writes -----------------------------------------------------------------------------------
 
-export async function addComment(user: AuthUser, code: string, text: string) {
+export async function addComment(user: AuthUser, actor: Actor, code: string, text: string) {
   const c = await load(user, code)
   const staff = isOps(user)
   await prisma.$transaction(async (tx) => {
     await tx.complaintUpdate.create({ data: { complaintId: c.id, authorId: user.id, authorName: user.name, staff, kind: 'comment', text } })
     if (staff && !c.firstResponseAt) await tx.complaint.update({ where: { id: c.id }, data: { firstResponseAt: new Date() } })
+    if (staff) await writeAudit(tx, actor, { action: 'complaint.comment', entity: 'Complaint', entityId: code })
   })
   return getComplaint(user, code)
 }
@@ -356,4 +357,9 @@ export async function markOverdue(now = new Date()) {
     data: { overdueAt: now },
   })
   return { marked: r.count }
+}
+
+/** Staff opening a complaint read a resident's own words and flat: that access is logged. */
+export async function auditView(actor: Actor, code: string) {
+  await writeAudit(prisma, actor, { action: 'pii.view', entity: 'Complaint', entityId: code, detail: 'Opened complaint detail' })
 }
