@@ -106,7 +106,7 @@ API:
 | `CORS_ORIGINS` | yes | comma separated list of allowed web origins |
 | `OTP_FIXED_CODE_ENABLED` | no | development only; refused in production |
 | `DEMO_OTP_PHONES` | no | comma separated phones that accept the fixed demo code, also in production |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | no | primary model. Without keys the app runs on its rules classifier |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | no | primary model (default `gemini-2.5-flash-lite`). A free Gemini key allows only about 20 requests per model per day, after which Groq answers, so keep both keys set. Without keys the app runs on its rules classifier |
 | `GROQ_API_KEY`, `GROQ_MODEL` | no | fallback model |
 | `STORAGE_DRIVER`, `STORAGE_DIR` | no | `local` (default) or `db` for hosts with no persistent disk |
 | `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | no | S3-compatible storage; wins over the other drivers when `S3_BUCKET` is set |
