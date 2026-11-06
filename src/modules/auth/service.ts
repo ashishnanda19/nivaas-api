@@ -12,13 +12,17 @@ export const OTP_TTL_MS = 5 * 60 * 1000
 export const OTP_MAX_ATTEMPTS = 5
 export const OTP_MAX_REQUESTS_PER_WINDOW = 3
 export const OTP_WINDOW_MS = 10 * 60 * 1000
+/** With the fixed demo code on, repeated sign-ins are normal, so the cap is looser. Real OTPs keep the strict cap. */
+export const OTP_MAX_REQUESTS_FIXED_MODE = 20
+export const otpRequestCap = (fixedMode: boolean) => (fixedMode ? OTP_MAX_REQUESTS_FIXED_MODE : OTP_MAX_REQUESTS_PER_WINDOW)
 
 const FIXED = '123456'
 
 export async function requestOtp(phone: string, sms: MessageProvider, now = new Date()) {
   const since = new Date(now.getTime() - OTP_WINDOW_MS)
   const recent = await prisma.otp.count({ where: { phone, createdAt: { gte: since } } })
-  if (recent >= OTP_MAX_REQUESTS_PER_WINDOW) throw tooMany('Too many codes requested for this number. Try again in a few minutes.')
+  const cap = otpRequestCap(config.OTP_FIXED_CODE_ENABLED)
+  if (recent >= cap) throw tooMany('Too many codes requested for this number. Try again in a few minutes.')
 
   const user = await prisma.user.findUnique({ where: { phone } })
   // Same response whether or not the number is registered, so numbers cannot be enumerated.

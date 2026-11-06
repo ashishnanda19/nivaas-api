@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '../src/lib/db.js'
 import { auth, login, makeApp, PHONES, seedFixture } from './helpers.js'
-import { OTP_MAX_ATTEMPTS } from '../src/modules/auth/service.js'
+import { OTP_MAX_ATTEMPTS, OTP_MAX_REQUESTS_FIXED_MODE, otpRequestCap } from '../src/modules/auth/service.js'
 
 let app: Awaited<ReturnType<typeof makeApp>>['app']
 beforeEach(async () => {
@@ -41,8 +41,13 @@ describe('OTP login', () => {
   })
 
   it('rate limits code requests per phone', async () => {
-    for (let i = 0; i < 3; i++) expect((await post('/auth/otp/request', { phone: PHONES.neeraj })).statusCode).toBe(200)
+    for (let i = 0; i < OTP_MAX_REQUESTS_FIXED_MODE; i++) expect((await post('/auth/otp/request', { phone: PHONES.neeraj })).statusCode).toBe(200)
     expect((await post('/auth/otp/request', { phone: PHONES.neeraj })).statusCode).toBe(429)
+  })
+
+  it('real OTP mode allows only 3 requests per window', () => {
+    expect(otpRequestCap(false)).toBe(3)
+    expect(otpRequestCap(true)).toBe(20)
   })
 
   it('answers the same for unknown numbers and sends nothing', async () => {
