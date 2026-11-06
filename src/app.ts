@@ -19,6 +19,8 @@ import { auditRoutes } from './modules/audit/routes.js'
 import { matchingRoutes } from './modules/matching/routes.js'
 import { complaintRoutes } from './modules/complaints/routes.js'
 import { visitorRoutes } from './modules/visitors/routes.js'
+import { amenityRoutes } from './modules/amenities/routes.js'
+import { noticeRoutes } from './modules/notices/routes.js'
 
 export interface AppDeps {
   sms?: MessageProvider
@@ -87,6 +89,8 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
       await api.register(matchingRoutes)
       await api.register(complaintRoutes)
       await api.register(visitorRoutes)
+      await api.register(amenityRoutes)
+      await api.register(noticeRoutes)
     },
     { prefix: '/api/v1' },
   )
