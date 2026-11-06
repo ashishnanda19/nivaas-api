@@ -27,6 +27,6 @@ services:
       - { key: JWT_REFRESH_SECRET, generateValue: true }
       - { key: PAYMENT_WEBHOOK_SECRET, generateValue: true }
       - { key: GEMINI_API_KEY, sync: false }
-      - { key: GEMINI_MODEL, value: gemini-2.5-flash }
+      - { key: GEMINI_MODEL, value: gemini-2.5-flash-lite }
       - { key: GROQ_API_KEY, sync: false }
       - { key: GROQ_MODEL, value: openai/gpt-oss-120b }

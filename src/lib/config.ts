@@ -18,7 +18,7 @@ const schema = z.object({
   // Comma-separated phone numbers that accept the fixed demo code even in production (the seeded demo accounts). Empty by default.
   DEMO_OTP_PHONES: z.string().optional().default(''),
   GEMINI_API_KEY: z.string().optional().default(''),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash-lite'),
   GROQ_API_KEY: z.string().optional().default(''),
   GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   PAYMENT_WEBHOOK_SECRET: z.string().min(8),
