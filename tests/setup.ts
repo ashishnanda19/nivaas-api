@@ -1,0 +1,11 @@
+// Runs before every test file, ahead of any app import, so config reads test values.
+process.env.NODE_ENV = 'test'
+process.env.DATABASE_URL = process.env.DATABASE_URL_TEST ?? 'postgresql://nivaas@localhost:5433/nivaas_test'
+process.env.JWT_SECRET = 'test-secret-test-secret-1234'
+process.env.JWT_REFRESH_SECRET = 'test-refresh-test-refresh-1234'
+process.env.PAYMENT_WEBHOOK_SECRET = 'test-webhook-secret'
+process.env.OTP_FIXED_CODE_ENABLED = 'true'
+process.env.GEMINI_API_KEY = ''
+process.env.GROQ_API_KEY = ''
+process.env.REDIS_URL = ''
+process.env.STORAGE_DIR = './storage-test'
