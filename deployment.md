@@ -36,7 +36,8 @@ Other residents have generated numbers and are not meant for login. The first si
 - **Duplicate linking:** Tower 14 has ten lift complaints linked under one parent. Duplicates are linked, never closed.
 - **Guard tablet:** log a visitor with a photo, then approve or deny it as the resident. Switch the browser to offline and keep logging; entries sync when the network returns.
 - **Pre-approved guest:** as Neeraj create a guest pre-approval, then enter the 6-digit code on the guard tablet. (The seeded sample code `482913` is only valid on the day the data was seeded.)
-- **Committee dashboard** as Meera: collections against billing, on-time rate, dues ageing, top defaulting towers, complaint times, reopened rate, and a monthly report download.
+- **Committee dashboard** as Meera: collections against billing, on-time rate, dues ageing, top defaulting towers, complaint times, reopened rate, a card that sets the brief's three targets (on-time 70% to 90%, reopened 25% to under 8%, matching work down 80%) beside where each stands now, and a monthly report download.
+- **Payment reminders** as Priya (Reminders in the console): the messages the daily job sent, 3 days before the due date, on it, and from day 5 overdue, in each resident's language. Press Run now; nothing is sent twice. No SMS provider is connected, so the messages are recorded here instead of delivered.
 - **Languages:** switch English, Hindi and Marathi from the sign-in page or the menu.
 
 ### Notes on the sample data
@@ -81,12 +82,12 @@ To run the API in a container as well: `docker compose --profile api up --build`
 | --- | --- | --- |
 | Database | Supabase Postgres (free tier, Singapore) | Session pooler connection string in `DATABASE_URL` |
 | API | Render web service (free plan), Docker | `render.yaml` blueprint. Auto deploys from `main`. The container runs `prisma migrate deploy` and then starts, so only committed migrations are applied |
-| Web | Vercel (hobby plan) | Project root directory `web`, framework preset Vite, `web/vercel.json` rewrites app routes to `index.html` |
+| Web | Vercel (hobby plan) | Project root directory `web`, framework preset Vite. `web/vercel.json` sends `/api/*` to the Render API and every other app route to `index.html` |
 | CI | GitHub Actions | API job (Postgres and Redis services, typecheck, tests with coverage) and a web job (lint, tests, build) |
 
 Order: create the database, deploy the API with its environment variables, seed once (`npm run seed -- --force-production` with `DATABASE_URL` pointing at the hosted database, demo environments only), deploy the web app with `VITE_API_URL` set to the API URL, then add the web URL to `CORS_ORIGINS` on the API.
 
-The refresh cookie is `HttpOnly; Secure; SameSite=None` in production so it works between the two domains. Browsers that block third-party cookies (Safari by default) cannot refresh a session, so sign-in lasts only as long as the 15 minute access token. A custom domain shared by both apps would remove this.
+The web app calls the API on its own domain: Vercel forwards `/api/*` to Render, so the session cookie is first-party and also works in Safari. For that, **leave `VITE_API_URL` unset on Vercel**. If it is set, the app calls the API directly on its other domain instead, which needs the web origin in `CORS_ORIGINS` and loses the session after the 15 minute access token in browsers that block third-party cookies. The cookie is `HttpOnly; Secure; SameSite=None` in production either way.
 
 ## Environment variables (names only)
 
@@ -117,9 +118,25 @@ Web:
 | Name | Notes |
 | --- | --- |
 | `VITE_USE_MOCK` | `true` runs on built-in mock data, `false` calls the API |
-| `VITE_API_URL` | base URL of the API, for example `https://nivaas-api-qazk.onrender.com`; build time |
+| `VITE_API_URL` | base URL of the API at build time. Leave it unset in production (the app then uses its own domain, see above). In development set `http://localhost:4000` |
 
 `.env` files are gitignored; only `.env.example` files are committed.
+
+## Evaluations
+
+Two scripts measure the AI and matching logic on labelled data and write their results next to the code in `eval/`:
+
+```bash
+npm run eval:ai          # rules classifier and safety rules on 66 labelled complaints (English, Hindi, Marathi), no network
+npm run eval:ai:live     # also the full pipeline with the configured Gemini and Groq keys (about 7 minutes at free-tier pace)
+DATABASE_URL=... npm run eval:matching   # the sample bank statement against what a human accountant would decide; needs a seeded database
+```
+
+The labelled sets were written by the author of the rules, so the figures are an optimistic bound, not a benchmark on independent data. Results are in `eval/RESULTS-*.md`.
+
+## Keeping the live demo awake
+
+The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A free uptime monitor that requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes avoids it during a review.
 
 ## File storage
 

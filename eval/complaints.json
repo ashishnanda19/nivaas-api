@@ -1,0 +1,372 @@
+[
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Water keeps leaking under our kitchen sink since last night",
+  "category": "PLUMBING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The washbasin pipe in the master bathroom has a crack and drips",
+  "category": "PLUMBING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "सिंक के नीचे से पानी रिस रहा है",
+  "category": "PLUMBING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "स्वयंपाकघरातील नळ गळत आहे",
+  "category": "PLUMBING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The switchboard in the living room is not working at all",
+  "category": "ELECTRICAL"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The fan regulator in the bedroom is broken, please send an electrician",
+  "category": "ELECTRICAL"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "हमारे फ्लैट की बिजली बार-बार जा रही है",
+  "category": "ELECTRICAL"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "बेडरूममधील स्विच चालत नाही",
+  "category": "ELECTRICAL"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The tower 9 lift takes very long and skips floors",
+  "category": "LIFT"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Lift buttons are not responding on the 7th floor",
+  "category": "LIFT"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "लिफ्ट बहुत धीरे चल रही है और आवाज करती है",
+  "category": "LIFT"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "लिफ्टचा दरवाजा नीट बंद होत नाही",
+  "category": "LIFT"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Delivery boys are entering without registering at the gate",
+  "category": "SECURITY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The gate intercom is not working so guards cannot call us",
+  "category": "SECURITY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "रात में गेट पर कोई गार्ड नहीं दिखता",
+  "category": "SECURITY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "बाहेरचे लोक विनापरवानगी आत येत आहेत",
+  "category": "SECURITY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Cleaners skip our floor and the corridor has not been swept for three days",
+  "category": "HOUSEKEEPING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Dustbins near tower 4 are overflowing and attracting flies",
+  "category": "HOUSEKEEPING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "सीढ़ियों की सफाई कई दिन से नहीं हुई",
+  "category": "HOUSEKEEPING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "पायऱ्यांची साफसफाई झालेली नाही",
+  "category": "HOUSEKEEPING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "A stranger's car is parked in my reserved slot",
+  "category": "PARKING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Two-wheelers are parked across the ramp and block the cars",
+  "category": "PARKING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "मेरी पार्किंग की जगह पर बाहर की गाड़ी खड़ी है",
+  "category": "PARKING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "रॅम्पवर दुचाकी लावल्याने गाड्या जाऊ शकत नाहीत",
+  "category": "PARKING"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The neighbours are playing loud music late at night",
+  "category": "NOISE"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Drilling noise from the flat below every morning",
+  "category": "NOISE"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "पड़ोसी रात को बहुत शोर करते हैं",
+  "category": "NOISE"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "वरच्या मजल्यावर रात्री खूप आवाज होतो",
+  "category": "NOISE"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "There has been no water in our taps since yesterday evening",
+  "category": "WATER_SUPPLY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Water comes out very weakly on the 15th floor",
+  "category": "WATER_SUPPLY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "हमारे नल में दो दिन से पानी नहीं आ रहा",
+  "category": "WATER_SUPPLY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "पाण्याचा दाब खूप कमी आहे",
+  "category": "WATER_SUPPLY"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The park near tower 12 has not been mowed and the grass is knee high",
+  "category": "GARDEN"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "A tree branch is hanging over the walkway",
+  "category": "GARDEN"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "पार्क में पेड़ों की छंटाई नहीं हुई है",
+  "category": "GARDEN"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "बागेत पाणी देत नाहीत, झाडे सुकत आहेत",
+  "category": "GARDEN"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "The society office is closed during working hours",
+  "category": "OTHER"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "en",
+  "text": "Please arrange a yoga class for senior citizens",
+  "category": "OTHER"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "hi",
+  "text": "सोसायटी ऑफिस में कोई नहीं मिलता",
+  "category": "OTHER"
+ },
+ {
+  "kind": "ordinary",
+  "lang": "mr",
+  "text": "सोसायटीच्या वार्षिक सभेची तारीख कळवा",
+  "category": "OTHER"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "There is a fire in the electrical room of tower 3"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "I can smell gas in the staircase"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "A child is stuck in the lift between the 4th and 5th floor"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "I got an electric shock when touching the washing machine"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "The basement is flooding and water is entering the parking"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "Part of the balcony slab has collapsed"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "My father is unconscious, please send help to flat 1204"
+ },
+ {
+  "kind": "safety",
+  "lang": "en",
+  "text": "Smoke is coming out of the meter box"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "रसोई में गैस लीक हो रही है"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "लिफ्ट में दो लोग फंसे हुए हैं"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "बिजली के तार से करंट लग रहा है"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "पार्किंग में आग लगी है"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "बेसमेंट में पानी भर गया है"
+ },
+ {
+  "kind": "safety",
+  "lang": "mr",
+  "text": "जिन्यात गॅसचा वास येत आहे"
+ },
+ {
+  "kind": "safety",
+  "lang": "mr",
+  "text": "लिफ्टमध्ये मुलगी अडकली आहे"
+ },
+ {
+  "kind": "safety",
+  "lang": "mr",
+  "text": "मीटर बॉक्समधून आग लागली आहे"
+ },
+ {
+  "kind": "safety",
+  "lang": "mr",
+  "text": "इमारतीची भिंत कोसळली आहे"
+ },
+ {
+  "kind": "safety",
+  "lang": "mr",
+  "text": "विजेचा धक्का बसला आहे"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "Lift mein bacche fas gaye hain"
+ },
+ {
+  "kind": "safety",
+  "lang": "hi",
+  "text": "Bijli ka jhatka laga hai"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "The lift is making a loud grinding noise but still works"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "Power cut in our flat since morning"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "Water is dripping slowly from the bathroom tap"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "The gas pipeline cabinet cover near the lobby is dusty"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "The fire extinguisher in tower 2 is past its expiry date"
+ },
+ {
+  "kind": "lookalike",
+  "lang": "en",
+  "text": "The smoke detector in our corridor beeps for a battery change"
+ }
+]
