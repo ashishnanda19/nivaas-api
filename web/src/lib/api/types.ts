@@ -171,6 +171,24 @@ export interface AuditEntry {
   target: string
   detail: string
 }
+export type ReminderKind = 'BEFORE_DUE' | 'ON_DUE' | 'OVERDUE'
+export interface ReminderLog {
+  id: string
+  flatId: string
+  period: string
+  kind: ReminderKind
+  language: string
+  phone: string
+  message: string
+  status: 'SENT' | 'FAILED'
+  at: string
+}
+export interface ReminderRun {
+  checked: number
+  sent: number
+  failed: number
+  skipped: number
+}
 export interface Staff {
   id: string
   name: string
@@ -208,6 +226,8 @@ export interface DashboardStats {
   avgResponseH: number
   avgResolutionH: number
   reopenedPct: number
+  /** How much of the statement work needs no hand matching: rows that qualify for one-click posting. */
+  matching: { rows: number; oneClickPct: number; avgMinutesToPost: number | null }
   billedTotal: number
   collectedTotal: number
 }

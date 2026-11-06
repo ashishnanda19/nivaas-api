@@ -24,13 +24,15 @@ export async function dashboard(monthsBack = 6, now = new Date(), tower?: number
   const periods = periodsBack(monthsBack, now)
   const from = new Date(`${periods[0]}-01T00:00:00Z`)
 
-  const [billed, collectedRows, windowBills, windowPays, open, flatCounts] = await Promise.all([
+  const [billed, collectedRows, windowBills, windowPays, open, flatCounts, stmtGroups, stmtMinutes] = await Promise.all([
     repo.billedByPeriod(periods, tower),
     repo.collectedByMonth(from, tower),
     repo.billsInPeriods(periods, tower),
     repo.successfulPayments(tower),
     openBills(now, tower),
     repo.flatsPerTower(),
+    repo.statementGroups(),
+    repo.avgMinutesToPost(),
   ])
   const billedBy = new Map(billed.map((b) => [b.period, b._sum.amountPaise ?? 0]))
   const collectedBy = new Map(collectedRows.map((r) => [r.m, Number(r.s)]))
@@ -62,6 +64,22 @@ export async function dashboard(monthsBack = 6, now = new Date(), tower?: number
     outstandingPaise: open.reduce((s, r) => s + r.remainingPaise, 0),
     topDefaultingTowers: topTowers,
     complaints: await complaintMetrics(now, undefined, tower),
+    matching: matchingMetrics(stmtGroups, stmtMinutes[0]?.m ?? null),
+  }
+}
+
+/**
+ * The brief's target is "payment matching time down 80%". Time saved cannot be measured against a manual baseline here, so the
+ * dashboard shows what drives it: the share of statement rows that qualify for one-click posting, and how long a posted row waited.
+ */
+export function matchingMetrics(groups: { confidence: string; state: string; _count: number }[], avgMinutes: number | null) {
+  const rows = groups.reduce((s, g) => s + g._count, 0)
+  const oneClick = groups.filter((g) => g.confidence === 'EXACT').reduce((s, g) => s + g._count, 0)
+  const posted = groups.filter((g) => g.state === 'POSTED').reduce((s, g) => s + g._count, 0)
+  return {
+    rows, oneClick, posted,
+    oneClickPct: rows ? Math.round((oneClick / rows) * 1000) / 10 : 0,
+    avgMinutesToPost: avgMinutes === null ? null : Math.round(avgMinutes * 10) / 10,
   }
 }
 

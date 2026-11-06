@@ -12,6 +12,32 @@ const CollectionChart = lazy(() => import('./Charts').then((m) => ({ default: m.
 const SimpleBars = lazy(() => import('./Charts').then((m) => ({ default: m.SimpleBars })))
 const ChartFallback = () => <Skeleton className="h-[240px]" />
 
+/** One of the brief's targets: where it started, where it is now, and where it should get to. */
+function TargetRow({ label, from, now, target, value, detail }: { label: string; from: string; now: string; target: string; value: number; detail?: string }) {
+  const pct = Math.max(0, Math.min(1, value))
+  return (
+    <li className="space-y-1.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="tabular-nums text-muted">
+          {from} <span aria-hidden>→</span> <span className="font-medium text-fg">{now}</span> <span aria-hidden>→</span> target {target}
+        </span>
+      </div>
+      <div
+        className="h-1.5 rounded-full bg-sunken"
+        role="progressbar"
+        aria-label={`${label}: ${Math.round(pct * 100)}% of the way from the starting point to the target`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct * 100)}
+      >
+        <div className="h-full rounded-full bg-accent" style={{ width: `${pct * 100}%` }} />
+      </div>
+      {detail && <p className="text-xs text-muted">{detail}</p>}
+    </li>
+  )
+}
+
 function report(s: DashboardStats, label: string) {
   downloadFile(
     `nivaas-monthly-report.pdf`,
@@ -123,6 +149,27 @@ export default function Dashboard() {
                 />
               </Card>
             </div>
+
+            <Card className="p-5">
+              <h2 className="mb-1 font-medium">Targets from the brief</h2>
+              <p className="mb-4 text-sm text-muted">Where each measure started, where it is now, and the target. The bar shows how far along that line it is.</p>
+              <ul className="space-y-5">
+                <TargetRow label="Paid on time" from="70%" now={`${s.onTimePct}%`} target="90%" value={(s.onTimePct - 70) / 20} />
+                <TargetRow label="Reopened complaints" from="25%" now={`${s.reopenedPct}%`} target="under 8%" value={(25 - s.reopenedPct) / 17} />
+                <TargetRow
+                  label="Payments matched without hand work"
+                  from="0% (every row by hand)"
+                  now={s.matching.rows ? `${s.matching.oneClickPct}%` : 'no statement yet'}
+                  target="80%"
+                  value={s.matching.oneClickPct / 80}
+                  detail={
+                    s.matching.rows
+                      ? `${s.matching.rows} statement rows so far${s.matching.avgMinutesToPost !== null ? `. A posted row waited ${s.matching.avgMinutesToPost} minutes on average` : ''}. This stands in for "matching time down 80%": rows that qualify for one-click posting need no manual matching.`
+                      : 'Upload a bank statement as the help desk to measure it. Rows that qualify for one-click posting need no manual matching.'
+                  }
+                />
+              </ul>
+            </Card>
 
             <div className="grid gap-4 lg:grid-cols-3">
               <Card className="p-5 lg:col-span-2">

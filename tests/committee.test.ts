@@ -3,6 +3,7 @@ import { prisma } from '../src/lib/db.js'
 import { auth, login, makeApp, PHONES, seedFixture } from './helpers.js'
 import { ageing, avg, bucketOf, onTimeRate, periodsBack } from '../src/modules/committee/metrics.js'
 import { setLlmClients } from '../src/modules/complaints/service.js'
+import { matchingMetrics } from '../src/modules/committee/service.js'
 
 describe('metrics (pure)', () => {
   it('puts days overdue into the four buckets, edges included', () => {
@@ -143,5 +144,37 @@ describe('tower filter and bill run list', () => {
     expect(r.length).toBeGreaterThan(0)
     expect(r[0]).toMatchObject({ bills: expect.any(Number), totalPaise: expect.any(Number), label: expect.any(String) })
     expect((await get('/billing/runs', swati)).statusCode).toBe(403)
+  })
+})
+
+describe('matching effort metric', () => {
+  it('is zero before any statement is uploaded', () => {
+    expect(matchingMetrics([], null)).toEqual({ rows: 0, oneClick: 0, posted: 0, oneClickPct: 0, avgMinutesToPost: null })
+  })
+  it('counts the share of rows that qualify for one-click posting', () => {
+    const m = matchingMetrics(
+      [
+        { confidence: 'EXACT', state: 'POSTED', _count: 3 }, { confidence: 'EXACT', state: 'PENDING', _count: 1 },
+        { confidence: 'LIKELY', state: 'QUEUED', _count: 4 }, { confidence: 'UNCLEAR', state: 'QUEUED', _count: 2 },
+      ],
+      12.34,
+    )
+    expect(m).toEqual({ rows: 10, oneClick: 4, posted: 3, oneClickPct: 40, avgMinutesToPost: 12.3 })
+  })
+  it('is on the dashboard response and reads real rows', async () => {
+    await seedFixture()
+    const { app } = await makeApp()
+    const t = await login(app, PHONES.committee)
+    const empty = (await app.inject({ method: 'GET', url: '/api/v1/committee/dashboard', headers: auth(t) })).json()
+    expect(empty.matching).toMatchObject({ rows: 0, oneClickPct: 0 })
+    const up = await prisma.bankStatementUpload.create({ data: { filename: 't.csv', uploadedBy: 'x', parseErrors: [] } })
+    const base = { uploadId: up.id, date: new Date(), amountPaise: 100, narration: 'n', reference: 'r' }
+    await prisma.bankStatementRow.createMany({ data: [
+      { ...base, lineNo: 1, confidence: 'EXACT', state: 'POSTED', postedAt: new Date(Date.now() + 5 * 60_000) },
+      { ...base, lineNo: 2, confidence: 'UNCLEAR', state: 'QUEUED' },
+    ] })
+    const d = (await app.inject({ method: 'GET', url: '/api/v1/committee/dashboard', headers: auth(t) })).json()
+    expect(d.matching).toMatchObject({ rows: 2, oneClick: 1, posted: 1, oneClickPct: 50 })
+    expect(d.matching.avgMinutesToPost).toBeGreaterThan(4)
   })
 })

@@ -37,4 +37,8 @@ export const committeeRepo = {
   complaintsResolved: (start: Date, end: Date) =>
     prisma.complaint.findMany({ where: { resolvedAt: { gte: start, lt: end } }, select: { createdAt: true, resolvedAt: true } }),
   society: () => prisma.society.findFirstOrThrow(),
+
+  statementGroups: () => prisma.bankStatementRow.groupBy({ by: ['confidence', 'state'], _count: true }),
+  avgMinutesToPost: () =>
+    prisma.$queryRaw<{ m: number | null }[]>`SELECT AVG(EXTRACT(EPOCH FROM (r."postedAt" - u."createdAt")) / 60)::float AS m FROM "BankStatementRow" r JOIN "BankStatementUpload" u ON u.id = r."uploadId" WHERE r.state = 'POSTED' AND r."postedAt" IS NOT NULL`,
 }
