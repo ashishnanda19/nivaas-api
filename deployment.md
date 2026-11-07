@@ -14,7 +14,7 @@ One repository, two apps: the **API** at the repository root and the **web app**
 
 ### Demo logins
 
-The demo OTP is **123456**. On the live site only the seven phones below accept it (`DEMO_OTP_PHONES`); any other number gets a random code and there is no SMS provider connected. Locally, with `OTP_FIXED_CODE_ENABLED=true`, every number accepts it.
+The demo OTP is **123456**. On the live site only the seven phones below accept it (`DEMO_OTP_PHONES`); any other number gets a random code that is texted only if the number is on the SMS allow-list (the live site allows one test number; Twilio is a trial account). Locally, with `OTP_FIXED_CODE_ENABLED=true`, every number accepts it.
 
 | Role | Phone | Who |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ Other residents have generated numbers and are not meant for login. The first si
 - **Guard tablet:** log a visitor with a photo, then approve or deny it as the resident. Switch the browser to offline and keep logging; entries sync when the network returns.
 - **Pre-approved guest:** as Neeraj create a guest pre-approval, then enter the 6-digit code on the guard tablet. (The seeded sample code `482913` is only valid on the day the data was seeded.)
 - **Committee dashboard** as Meera: collections against billing, on-time rate, dues ageing, top defaulting towers, complaint times, reopened rate, a card that sets the brief's three targets (on-time 70% to 90%, reopened 25% to under 8%, matching work down 80%) beside where each stands now, and a monthly report download.
-- **Payment reminders** as Priya (Reminders in the console): the messages the daily job sent, 3 days before the due date, on it, and from day 5 overdue, in each resident's language. Press Run now; nothing is sent twice. No SMS provider is connected, so the messages are recorded here instead of delivered.
+- **Payment reminders** as Priya (Reminders in the console): the messages the daily job sent, 3 days before the due date, on it, and from day 5 overdue, in each resident's language. Press Run now; nothing is sent twice. Messages are recorded here and are delivered by Twilio only to allow-listed numbers; the live site allows one test number.
 - **Languages:** switch English, Hindi and Marathi from the sign-in page or the menu.
 
 ### Notes on the sample data
