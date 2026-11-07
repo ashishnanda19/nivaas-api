@@ -6,9 +6,10 @@ export const matchingRepo = {
   flatsWithResidents: () =>
     prisma.flat.findMany({ include: { members: { where: { active: true, relation: { in: ['OWNER', 'TENANT'] } }, include: { user: { select: { name: true } } } } } }),
   allLedger: () => prisma.ledgerEntry.findMany({ orderBy: [{ flatId: 'asc' }, { seq: 'asc' }], select: { flatId: true, type: true, amountPaise: true, ref: true, period: true } }),
-  upiPayers: () => prisma.knownPayer.findMany({ where: { upiId: { not: null } } }),
+  knownPayers: () => prisma.knownPayer.findMany(),
   postedBankReferences: () => prisma.payment.findMany({ where: { source: 'BANK_CSV', status: 'SUCCESS' }, select: { reference: true } }),
 
+  setUploadFile: (id: string, fileKey: string) => prisma.bankStatementUpload.update({ where: { id }, data: { fileKey } }),
   uploadById: (id: string) => prisma.bankStatementUpload.findUnique({ where: { id } }),
   uploadsPage: (skip: number, take: number) =>
     Promise.all([

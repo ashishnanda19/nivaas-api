@@ -36,6 +36,11 @@ export async function matchingRoutes(app: FastifyInstance) {
     return svc.getUpload((req.params as { id: string }).id, pageArgs(q))
   })
 
+  app.get('/matching/uploads/:id/file', ops, async (req, reply) => {
+    const f = await svc.uploadFile((req.params as { id: string }).id, actorOf(req))
+    return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${f.filename.replace(/"/g, '')}"`).send(f.data)
+  })
+
   app.get('/matching/queue', ops, async (req) => {
     const q = parse(pageQuery, req.query)
     const r = await svc.accountsQueue(pageArgs(q))

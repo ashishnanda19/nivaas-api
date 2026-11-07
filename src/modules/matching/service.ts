@@ -4,6 +4,7 @@ import { badRequest, conflict, notFound } from '../../lib/errors.js'
 import { allocate, postPaymentEntries } from '../billing/ledger.js'
 import { writeAudit, type Actor } from '../audit/service.js'
 import { calcMaintenance } from '../../lib/money.js'
+import { storage } from '../../lib/storage.js'
 import { matchingRepo as repo } from './repo.js'
 import { parseStatement } from './csv.js'
 import { isBulkPostable, matchRows, norm, type FlatInfo, type MatchResult } from './engine.js'
@@ -14,12 +15,16 @@ export async function loadFlatInfos(): Promise<FlatInfo[]> {
   const [flats, ledger, payers] = await Promise.all([
     repo.flatsWithResidents(),
     repo.allLedger(),
-    repo.upiPayers(),
+    repo.knownPayers(),
   ])
   const byFlat = new Map<string, typeof ledger>()
   for (const e of ledger) (byFlat.get(e.flatId) ?? byFlat.set(e.flatId, []).get(e.flatId)!).push(e)
   const upis = new Map<string, string[]>()
-  for (const p of payers) (upis.get(p.flatId) ?? upis.set(p.flatId, []).get(p.flatId)!).push(p.upiId!)
+  const names = new Map<string, string[]>()
+  for (const p of payers) {
+    if (p.upiId) (upis.get(p.flatId) ?? upis.set(p.flatId, []).get(p.flatId)!).push(p.upiId)
+    if (p.payerName) (names.get(p.flatId) ?? names.set(p.flatId, []).get(p.flatId)!).push(p.payerName)
+  }
   return flats.map((f) => {
     const d = allocate(byFlat.get(f.id) ?? [])
     return {
@@ -27,7 +32,7 @@ export async function loadFlatInfos(): Promise<FlatInfo[]> {
       monthlyBillPaise: calcMaintenance(f.areaSqft, soc.ratePaisePerSqft),
       oldestOpenBillPaise: d.openBills[0]?.remainingPaise ?? 0,
       openBillsPaise: d.openBills.reduce((s, b) => s + b.remainingPaise, 0),
-      balancePaise: d.balancePaise, knownUpiIds: upis.get(f.id) ?? [],
+      balancePaise: d.balancePaise, knownUpiIds: upis.get(f.id) ?? [], knownPayerNames: names.get(f.id) ?? [],
     }
   })
 }
@@ -38,6 +43,8 @@ export async function postedReferences(): Promise<Set<string>> {
 }
 
 export async function uploadStatement(filename: string, text: string, actor: Actor) {
+  // Keep the original file as received, so a posting can always be traced back to the bank's own statement.
+  const fileKey = await storage.put('statements', Buffer.from(text, 'utf8'), 'csv')
   const parsed = parseStatement(text)
   const [flats, posted] = await Promise.all([loadFlatInfos(), postedReferences()])
   const results = matchRows({ rows: parsed.rows, flats, postedReferences: posted })
@@ -45,7 +52,7 @@ export async function uploadStatement(filename: string, text: string, actor: Act
 
   const upload = await prisma.$transaction(async (tx) => {
     const up = await tx.bankStatementUpload.create({
-      data: { filename: filename.slice(0, 120), uploadedBy: actor.id ?? 'system', parseErrors: parsed.errors as unknown as Prisma.InputJsonValue },
+      data: { filename: filename.slice(0, 120), fileKey, uploadedBy: actor.id ?? 'system', parseErrors: parsed.errors as unknown as Prisma.InputJsonValue },
     })
     await tx.bankStatementRow.createMany({
       data: parsed.rows.map((r) => {
@@ -83,6 +90,16 @@ export const rowView = (r: BankStatementRow) => {
     label: r.label, reasons: why.reasons ?? [], candidates: why.candidates ?? [], duplicateOf: why.duplicateOf ?? null,
     state: r.state, matchedFlatId: r.matchedFlatId, postedAt: r.postedAt?.toISOString() ?? null,
   }
+}
+
+/** The original CSV exactly as uploaded. Reading it is audited, because it holds payers' names and account details. */
+export async function uploadFile(id: string, actor: Actor) {
+  const up = await repo.uploadById(id)
+  if (!up) throw notFound('Upload not found')
+  const data = up.fileKey ? await storage.get(up.fileKey) : null
+  if (!data) throw notFound('The original file was not kept for this upload')
+  await writeAudit(prisma, actor, { action: 'statement.download', entity: 'BankStatementUpload', entityId: id, detail: up.filename })
+  return { filename: up.filename, data }
 }
 
 export async function listUploads(page: { skip: number; take: number }) {
@@ -132,7 +149,12 @@ export async function postRow(rowId: string, opts: PostOpts, actor: Actor) {
     await tx.receipt.create({ data: { paymentId: pay.id, number: `NIV-${new Date().getUTCFullYear()}-B${String(await tx.receipt.count() + 1).padStart(6, '0')}` } })
     await tx.bankStatementRow.update({ where: { id: row.id }, data: { state: 'POSTED', matchedFlatId: flatId, postedBy: actor.id, postedAt: new Date(), paymentId: pay.id } })
     // Learn the payer only from a confirmed posting.
-    if (row.upiId) await tx.knownPayer.upsert({ where: { flatId_upiId: { flatId, upiId: row.upiId } }, update: {}, create: { flatId, upiId: row.upiId, payerName: row.payerName } })
+    if (row.upiId) {
+      await tx.knownPayer.upsert({ where: { flatId_upiId: { flatId, upiId: row.upiId } }, update: row.payerName ? { payerName: row.payerName } : {}, create: { flatId, upiId: row.upiId, payerName: row.payerName } })
+    } else if (row.payerName && !(await tx.knownPayer.findFirst({ where: { flatId, upiId: null, payerName: row.payerName } }))) {
+      // A transfer with no UPI ID still teaches the payer's name, so the next one is recognised.
+      await tx.knownPayer.create({ data: { flatId, payerName: row.payerName } })
+    }
     await writeAudit(tx, actor, {
       action: 'statement.post', entity: 'BankStatementRow', entityId: row.id,
       before: { suggestedFlatId: row.suggestedFlatId, confidence: row.confidence, label: row.label },

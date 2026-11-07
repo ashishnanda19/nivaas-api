@@ -1,0 +1,18 @@
+name: Keep demo awake
+
+# The free API host sleeps after about 15 minutes idle and the first request then takes up to a minute.
+# This pings the health endpoint so a reviewer does not meet a cold start. It changes nothing.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Request /health
+        run: curl --fail --silent --show-error --max-time 90 --retry 2 --retry-delay 10 https://nivaas-api-qazk.onrender.com/health

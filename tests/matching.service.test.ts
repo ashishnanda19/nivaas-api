@@ -160,3 +160,42 @@ describe('posting safety', () => {
     expect(await prisma.auditLog.count({ where: { action: 'statement.upload' } })).toBe(1)
   })
 })
+
+describe('the original file and learned payer names', () => {
+  it('keeps the uploaded CSV exactly as received and serves it to the help desk, audited', async () => {
+    const up = await upload()
+    const res = await app.inject({ method: 'GET', url: `/api/v1/matching/uploads/${up.json().id}/file`, headers: auth(hd) })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+    expect(res.headers['content-disposition']).toContain('statement.csv')
+    expect(res.body).toBe(SAMPLE_CSV)
+    expect(await prisma.auditLog.count({ where: { action: 'statement.download' } })).toBe(1)
+  })
+
+  it('does not hand the file to residents', async () => {
+    const up = await upload()
+    const resident = await login(app, PHONES.neeraj)
+    const res = await app.inject({ method: 'GET', url: `/api/v1/matching/uploads/${up.json().id}/file`, headers: auth(resident) })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('learns the name on a confirmed posting and then recognises that payer, but only as a weak hint', async () => {
+    // A relative pays for flat T12-0408. The name on the statement is not a resident's name.
+    const first = await upload('Date,Amount,Reference,Payer Name\n05/11/2026,3000,T12-0408 PART,Ramesh Pandit\n', 'a.csv')
+    const row = first.json().rows[0]
+    expect((await post(row.id, { flatId: 'T12-0408' })).statusCode).toBe(200)
+    expect(await prisma.knownPayer.count({ where: { flatId: 'T12-0408', payerName: 'Ramesh Pandit' } })).toBe(1)
+
+    // The same person pays again with no flat in the reference: the flat now shows up as a candidate, never as a suggestion to post.
+    const second = await upload('Date,Amount,Reference,Payer Name\n07/11/2026,500,NEFT 991,Ramesh Pandit\n', 'b.csv')
+    const r2 = second.json().rows[0]
+    expect(r2.confidence).toBe('UNCLEAR')
+    expect(r2.state).toBe('QUEUED')
+    expect(r2.candidates).toEqual(['T12-0408'])
+    expect(r2.reasons.join(' ')).toContain('similar payer name points to T12-0408')
+
+    // Posting the same name again does not pile up duplicate rows.
+    await post(r2.id, { flatId: 'T12-0408' })
+    expect(await prisma.knownPayer.count({ where: { flatId: 'T12-0408', payerName: 'Ramesh Pandit' } })).toBe(1)
+  })
+})

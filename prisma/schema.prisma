@@ -273,6 +273,8 @@ model Receipt {
 model BankStatementUpload {
   id         String   @id @default(cuid())
   filename   String
+  /** Storage key of the CSV exactly as uploaded */
+  fileKey    String?
   uploadedBy String
   status     UploadStatus @default(PARSED)
   parseErrors Json    @default("[]")

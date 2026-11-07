@@ -19,6 +19,8 @@ export interface FlatInfo {
   /** Everything owed including late fee. <= 0 means nothing owed. */
   balancePaise: number
   knownUpiIds: string[]
+  /** Payer names confirmed for this flat by earlier postings (the name on the bank statement, e.g. a relative who pays). */
+  knownPayerNames?: string[]
 }
 
 export type Confidence = 'EXACT' | 'LIKELY' | 'UNCLEAR'
@@ -134,6 +136,7 @@ export function matchRows(input: EngineInput): MatchResult[] {
       else if (m === 'short') add('flat_id_short', f, `Reference has a short code that fits ${f.flatId} (weak: many flats share it)`)
       if (row.upiId && f.knownUpiIds.includes(row.upiId)) add('known_upi', f, `UPI ID ${row.upiId} was confirmed for ${f.flatId} before`)
       if (f.residentNames.some((n) => nameMatches(n, nameText))) add('payer_name', f, `Payer name is similar to a resident of ${f.flatId} (weak)`)
+      else if ((f.knownPayerNames ?? []).some((n) => nameMatches(n, nameText))) add('payer_name', f, `Payer name was confirmed for ${f.flatId} before (weak)`)
       const amt = row.amountPaise
       if (f.oldestOpenBillPaise > 0 && (amt === f.oldestOpenBillPaise || amt === f.openBillsPaise))
         add('amount_bill', f, `Amount equals the open bill of ${f.flatId}`)

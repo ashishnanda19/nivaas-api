@@ -31,7 +31,7 @@ Other residents have generated numbers and are not meant for login. The first si
 ### Things worth trying
 
 - **Pay a bill (test mode)** as Aamir or Swati: breakup with late fee, test gateway, receipt PDF, ledger. Paying twice with the same click does not double post.
-- **Bank statement matching** as Priya: upload `samples/bank-statement.csv`. You get exact, duplicate, already-paid, two-month and unclear rows with the reason for each. Nothing posts until you confirm. `Post all exact` posts only the exact rows and re-checks each against today's dues first. Unclear rows go to the Accounts queue where a flat is chosen by hand.
+- **Bank statement matching** as Priya: upload `samples/bank-statement.csv`. You get exact, duplicate, already-paid, two-month and unclear rows with the reason for each. Nothing posts until you confirm. `Post all exact` posts only the exact rows and re-checks each against today's dues first. Unclear rows go to the Accounts queue where a flat is chosen by hand. The uploaded file is kept and can be downloaded again by the help desk (audited), and payer names on confirmed postings are remembered as a weak hint.
 - **Safety escalation** as Swati: file a complaint such as "there is a gas smell in the kitchen" (or in Hindi or Marathi). It is escalated to the duty manager by rule, and nobody can lower it afterwards.
 - **Duplicate linking:** Tower 14 has ten lift complaints linked under one parent. Duplicates are linked, never closed.
 - **Guard tablet:** log a visitor with a photo, then approve or deny it as the resident. Switch the browser to offline and keep logging; entries sync when the network returns.
@@ -165,7 +165,7 @@ npm run embeddings:backfill
 
 ## Keeping the live demo awake
 
-The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A free uptime monitor that requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes avoids it during a review.
+The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub may delay scheduled runs, so a cold start is still possible; wait a minute and retry.
 
 ## File storage
 
