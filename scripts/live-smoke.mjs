@@ -10,7 +10,8 @@ const V = BASE + '/api/v1'
 let pass = 0, fail = 0; const out = []
 const ck = (name, ok, extra='') => { (ok ? pass++ : fail++); out.push(`${ok?'PASS':'FAIL'}  ${name} ${extra}`) }
 async function call(method, path, token, body, headers={}) {
-  let r; const t0=Date.now(); try { r = await fetch(V + path, { signal: AbortSignal.timeout(45000), method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) }) } catch (e) { out.push('TIMEOUT '+method+' '+path+' after '+(Date.now()-t0)+'ms'); return { s: 0, j: null, r: null } }
+  let r; const t0=Date.now(); const safe = method === 'GET'; for (let a = 0; a < (safe ? 3 : 1) && !r; a++) try { r = await fetch(V + path, { signal: AbortSignal.timeout(45000), method, headers: { connection: 'close', 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) }) } catch (e) { out.push('NETWORK '+method+' '+path+' '+(e.cause?.code ?? e.message)+' after '+(Date.now()-t0)+'ms'+(safe ? ' (retrying)' : '')) }
+  if (!r) return { s: 0, j: null, r: null }
   let j = null; try { j = await r.clone().json() } catch {}
   return { s: r.status, j, r }
 }
@@ -102,12 +103,13 @@ r = await call('POST', '/pre-approvals/verify', T.neeraj, { code: '000000' }); c
 r = await call('POST', '/pre-approvals/verify', T.guard, { code: '000000' }); ck('invalid pre-approval code -> 4xx not 5xx', r.s >= 400 && r.s < 500, r.s)
 r = await call('POST', '/pre-approvals/verify', T.guard, { code: 'abc' }); ck('malformed pre-approval code -> 400', r.s === 400, r.s)
 // matching upload validation (helpdesk)
+const rawFetch = async (url, init) => { for (let a = 0; a < 3; a++) { try { return await fetch(url, { ...init, headers: { connection: 'close', ...init.headers }, signal: AbortSignal.timeout(45000) }) } catch { /* retry */ } } return { status: 0, headers: new Headers(), text: async () => '' } }
 const fd = new FormData(); fd.append('file', new Blob(['not,a,statement\n1,2'], { type: 'text/csv' }), 'bad.csv')
-let mr = await fetch(V + '/matching/uploads', { method: 'POST', headers: { authorization: 'Bearer ' + T.priya }, body: fd }); const mj = await mr.text(); ck('bad CSV upload -> 4xx not 5xx', mr.status >= 400 && mr.status < 500, mr.status + ' ' + mj.slice(0,300))
-mr = await fetch(V + '/matching/uploads', { method: 'POST', headers: { authorization: 'Bearer ' + T.neeraj }, body: fd }); ck('resident CSV upload -> 403', mr.status === 403, mr.status)
+let mr = await rawFetch(V + '/matching/uploads', { method: 'POST', headers: { authorization: 'Bearer ' + T.priya }, body: fd }); const mj = await mr.text(); ck('bad CSV upload -> 4xx not 5xx', mr.status >= 400 && mr.status < 500, mr.status + ' ' + mj.slice(0,300))
+mr = await rawFetch(V + '/matching/uploads', { method: 'POST', headers: { authorization: 'Bearer ' + T.neeraj }, body: fd }); ck('resident CSV upload -> 403', mr.status === 403, mr.status)
 // headers
-const h = await fetch(BASE + '/api/v1/auth/me'); ck('security headers present (nosniff)', h.headers.get('x-content-type-options') === 'nosniff')
+const h = await rawFetch(BASE + '/api/v1/auth/me', { headers: {} }); ck('security headers present (nosniff)', h.headers.get('x-content-type-options') === 'nosniff')
 r = await call('GET', '/committee/dashboard', T.meeraN); ck('dashboard has data', r.s === 200 && JSON.stringify(r.j).length > 200, `${JSON.stringify(r.j).length} bytes`)
-r = await fetch(V + '/committee/report.pdf?period=2026-10', { headers: { authorization: 'Bearer ' + T.meeraN } }); ck('monthly PDF report downloads', r.status === 200 && (r.headers.get('content-type')||'').includes('pdf'), r.status)
-r = await fetch(V + '/committee/report.csv?period=2026-10', { headers: { authorization: 'Bearer ' + T.meeraN } }); ck('monthly CSV report downloads', r.status === 200, r.status)
+r = await rawFetch(V + '/committee/report.pdf?period=2026-10', { headers: { authorization: 'Bearer ' + T.meeraN } }); ck('monthly PDF report downloads', r.status === 200 && (r.headers.get('content-type')||'').includes('pdf'), r.status)
+r = await rawFetch(V + '/committee/report.csv?period=2026-10', { headers: { authorization: 'Bearer ' + T.meeraN } }); ck('monthly CSV report downloads', r.status === 200, r.status)
 console.log(out.join('\n')); console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0)

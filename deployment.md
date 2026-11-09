@@ -177,7 +177,11 @@ cd web && npm run lint && npm test && npm run build                             
 DATABASE_URL=postgresql://nivaas@localhost:5433/nivaas_eval npm run migrate && npm run seed
 DATABASE_URL=... npm run eval:ai && npm run eval:matching && npm run eval:dupes
 
-# Black-box smoke test of a running site, 68 checks (access matrix, validation, safety classification, reports)
+# Feature test of a LIVE site, 169 checks across every role and flow. It WRITES (pays bills, posts the sample statement, creates
+# complaints, visitors and notices), so use a demo database, then restore it with: npm run seed -- --reset --force-production
+node scripts/live-features.mjs https://nivaas-api-hazel.vercel.app samples/bank-statement.csv
+
+# Read-only black-box smoke test of a running site, 68 checks (access matrix, validation, safety classification, reports)
 node scripts/live-smoke.mjs https://nivaas-api-hazel.vercel.app      # or a local API, e.g. http://localhost:4000
 ```
 
