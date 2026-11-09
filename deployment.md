@@ -169,7 +169,7 @@ Everything below was run on 9 November 2026; the results are quoted in the Techn
 
 ```bash
 # API tests need a throwaway Postgres 14+ (any port) and, optionally, Redis. The suite empties every table in DATABASE_URL_TEST.
-DATABASE_URL_TEST=postgresql://nivaas@localhost:5433/nivaas_test REDIS_TEST_URL=redis://localhost:6379 npm test   # 362 pass, 3 skipped (need an S3 server)
+DATABASE_URL_TEST=postgresql://nivaas@localhost:5433/nivaas_test REDIS_TEST_URL=redis://localhost:6379 npm test   # 365 pass, 3 skipped (need an S3 server)
 npm run typecheck && npm run test:cov                                                                          # lines 94%, statements 91%
 cd web && npm run lint && npm test && npm run build                                                            # 22 tests
 
@@ -183,7 +183,9 @@ node scripts/live-smoke.mjs https://nivaas-api-hazel.vercel.app      # or a loca
 
 ## Keeping the live demo awake
 
-The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub throttles scheduled runs (in practice they ran hours apart, not every 10 minutes), so the host does sleep and a cold start is expected: wait a minute and retry. A cold start took 53 seconds when measured on 9 November.
+The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub throttles scheduled runs (in practice they ran hours apart, not every 10 minutes), so the host does sleep and a cold start is expected: wait a minute and retry. A cold start took 53 seconds when measured on 9 November. For a steadier demo, also point a free external uptime monitor (for example UptimeRobot or cron-job.org, every 5 minutes) at `/health`; GitHub's scheduler cannot guarantee the interval.
+
+The API also guards against a pooled database silently dropping idle connections: connect and pool timeouts are added to `DATABASE_URL` when absent, a failed connection-class query (Prisma P1001, P1002, P1008, P1017, P2024) is retried once, and a `SELECT 1` keeps a connection warm every 4 minutes while the process is awake.
 
 ## File storage
 
