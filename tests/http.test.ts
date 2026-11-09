@@ -99,3 +99,14 @@ describe('over HTTP', () => {
     await api().get('/api/v1/billing/ledger?flatId=T07-1203&pageSize=500').set('Authorization', `Bearer ${token}`).expect(400)
   })
 })
+
+describe('connection settings behind a proxy', () => {
+  it('keeps idle connections open longer than the 60 second proxies in front of it', async () => {
+    const { buildApp, KEEP_ALIVE_MS } = await import('../src/app.js')
+    const app = await buildApp()
+    expect(KEEP_ALIVE_MS).toBeGreaterThan(60_000)
+    expect(app.server.keepAliveTimeout).toBe(KEEP_ALIVE_MS)
+    expect(app.server.headersTimeout).toBeGreaterThan(app.server.keepAliveTimeout)
+    await app.close()
+  })
+})

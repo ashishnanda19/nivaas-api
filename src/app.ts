@@ -32,8 +32,14 @@ export interface AppDeps {
   scheduler?: Scheduler
 }
 
+export const KEEP_ALIVE_MS = 65_000
+
 export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
-  const app = Fastify({ loggerInstance: logger, bodyLimit: 1_000_000, trustProxy: true })
+  // Node closes idle keep-alive connections after 5 seconds by default. The proxies in front of the API (Render, Vercel) keep theirs
+  // open for about 60 seconds, so they sometimes send a request down a connection Node has just closed and the client sees a reset
+  // or a hang. Keeping ours open longer than theirs removes that race. headersTimeout must exceed keepAliveTimeout.
+  const app = Fastify({ loggerInstance: logger, bodyLimit: 1_000_000, trustProxy: true, keepAliveTimeout: KEEP_ALIVE_MS })
+  app.server.headersTimeout = KEEP_ALIVE_MS + 1_000
   const scheduler = deps.scheduler ?? new Scheduler()
 
   await app.register(helmet, { contentSecurityPolicy: config.isProd ? undefined : false })
