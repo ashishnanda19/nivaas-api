@@ -39,9 +39,9 @@ function PhoneMock() {
 export default function Landing() {
   const { t } = useTranslation()
   const features = [
-    { icon: Landmark, title: t('landing.f1t'), body: t('landing.f1b') },
-    { icon: MessageSquare, title: t('landing.f2t'), body: t('landing.f2b') },
-    { icon: DoorOpen, title: t('landing.f3t'), body: t('landing.f3b') },
+    { icon: Landmark, title: t('landing.f1t'), body: t('landing.f1b'), points: [t('landing.p11'), t('landing.p12'), t('landing.p13')] },
+    { icon: MessageSquare, title: t('landing.f2t'), body: t('landing.f2b'), points: [t('landing.p21'), t('landing.p22'), t('landing.p23')] },
+    { icon: DoorOpen, title: t('landing.f3t'), body: t('landing.f3b'), points: [t('landing.p31'), t('landing.p32'), t('landing.p33')] },
   ]
   return (
     <div className="min-h-dvh bg-bg">
@@ -102,7 +102,7 @@ export default function Landing() {
         </section>
 
         <section className="mx-auto max-w-6xl divide-y divide-line px-6">
-          {features.map(({ icon: Icon, title, body }, i) => (
+          {features.map(({ icon: Icon, title, body, points }, i) => (
             <motion.div key={title} {...fade} className="grid items-center gap-6 py-14 md:grid-cols-2">
               <div className={i % 2 ? 'md:order-2' : ''}>
                 <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-card bg-accent-tint text-ink">
@@ -113,16 +113,13 @@ export default function Landing() {
               </div>
               <div className="flex min-h-[160px] items-center justify-center rounded-card border border-line bg-sunken p-6">
                 <ul className="w-full max-w-xs space-y-2.5 text-sm">
-                  {[1, 2, 3].map((n) => (
+                  {points.map((point) => (
                     <li
-                      key={n}
-                      className="flex items-center gap-2.5 rounded-ctl bg-surface px-3 py-2.5 shadow-sm"
+                      key={point}
+                      className="flex items-start gap-2.5 rounded-ctl bg-surface px-3 py-2.5 shadow-sm"
                     >
-                      <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />
-                      <span
-                        className="h-2 flex-1 rounded-full bg-line"
-                        style={{ maxWidth: `${90 - n * 18}%` }}
-                      />
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+                      <span className="text-ink">{point}</span>
                     </li>
                   ))}
                 </ul>
