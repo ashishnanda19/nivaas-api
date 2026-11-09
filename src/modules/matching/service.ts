@@ -43,9 +43,13 @@ export async function postedReferences(): Promise<Set<string>> {
 }
 
 export async function uploadStatement(filename: string, text: string, actor: Actor) {
+  const parsed = parseStatement(text)
+  // A file with nothing usable in it is refused before anything is stored, with the first reasons so the user can fix it.
+  if (parsed.rows.length === 0) {
+    throw badRequest('No valid rows were found in this file. Expected columns: Date, Amount, Reference (or Narration).', parsed.errors.slice(0, 5))
+  }
   // Keep the original file as received, so a posting can always be traced back to the bank's own statement.
   const fileKey = await storage.put('statements', Buffer.from(text, 'utf8'), 'csv')
-  const parsed = parseStatement(text)
   const [flats, posted] = await Promise.all([loadFlatInfos(), postedReferences()])
   const results = matchRows({ rows: parsed.rows, flats, postedReferences: posted })
   const byLine = new Map(results.map((r) => [r.lineNo, r]))

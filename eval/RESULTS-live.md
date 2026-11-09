@@ -36,7 +36,7 @@ False escalations (kept on purpose: a wrong escalation costs a phone call, a mis
 | Measure | Result |
 | --- | --- |
 | Category accuracy, all ordinary | 40/40 (100.0%) |
-| Answered by | gemini 20, groq 20 |
+| Answered by | gemini 22, groq 18 |
 | Flagged "needs review" | 0 |
 | Safety complaints escalated end to end | 20/20 (100.0%) |
 

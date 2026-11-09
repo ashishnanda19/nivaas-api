@@ -41,6 +41,31 @@ describe('upload', () => {
     expect(r.json().parseErrors).toHaveLength(1)
   })
 
+  it('refuses a file with no usable rows and stores nothing', async () => {
+    for (const csv of ['', 'Date,Amount,Reference\n', 'not,a,statement\n1,2', 'Date,Amount,Reference\nbad,x,y\n']) {
+      const r = await upload(csv)
+      expect(r.statusCode, JSON.stringify(csv)).toBe(400)
+      expect(r.json().error.code).toBe('BAD_REQUEST')
+    }
+    expect(await prisma.bankStatementUpload.count()).toBe(0)
+    expect(await prisma.bankStatementRow.count()).toBe(0)
+  })
+
+  it('uploading the same statement twice never posts twice: the second copy is held as duplicates', async () => {
+    const first = await upload()
+    const exact = (first.json().rows as { id: string; confidence: string }[]).filter((x) => x.confidence === 'EXACT')
+    expect(exact.length).toBeGreaterThan(0)
+    const before = await prisma.payment.count()
+    await app.inject({ method: 'POST', url: `/api/v1/matching/uploads/${first.json().id}/post-all-exact`, headers: auth(hd), payload: {} })
+    const mid = await prisma.payment.count()
+    expect(mid).toBeGreaterThan(before)
+    const second = await upload()
+    const again = second.json().rows as { confidence: string; label: string | null }[]
+    expect(again.filter((x) => x.confidence === 'EXACT')).toHaveLength(0)
+    await app.inject({ method: 'POST', url: `/api/v1/matching/uploads/${second.json().id}/post-all-exact`, headers: auth(hd), payload: {} })
+    expect(await prisma.payment.count()).toBe(mid)
+  })
+
   it('is for the help desk only', async () => {
     for (const phone of [PHONES.neeraj, PHONES.committee, PHONES.guard]) {
       const t = await login(app, phone)
