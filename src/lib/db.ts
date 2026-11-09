@@ -24,7 +24,10 @@ export const isConnectionError = (e: unknown) =>
   (e instanceof Prisma.PrismaClientKnownRequestError && CONNECTION_ERRORS.has(e.code)) ||
   (e instanceof Prisma.PrismaClientInitializationError)
 
-const base = new PrismaClient({ datasourceUrl: withTimeouts(process.env.DATABASE_URL) })
+// Interactive transactions default to a 5 second limit. With the API and the database in different regions every query costs
+// a round trip of 100 to 250 ms, so a transaction of twenty queries can be killed half way. These limits keep them alive.
+export const TX_OPTIONS = { maxWait: 15_000, timeout: 60_000 }
+const base = new PrismaClient({ datasourceUrl: withTimeouts(process.env.DATABASE_URL), transactionOptions: TX_OPTIONS })
 
 export const prisma = base.$extends({
   query: {

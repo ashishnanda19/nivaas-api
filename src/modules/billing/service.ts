@@ -46,6 +46,8 @@ export async function billRunPreview(period: string) {
   }
 }
 
+const BILL_RUN_CONCURRENCY = 6
+
 /** Publish a bill run. Idempotent per flat and month: running it twice bills nobody twice. */
 export async function billRunPublish(period: string, actor: Actor) {
   if (!periodOk(period)) throw badRequest('period must be YYYY-MM')
@@ -53,9 +55,11 @@ export async function billRunPublish(period: string, actor: Actor) {
   const flats = await repo.flatAreas()
   let created = 0
   let total = 0
-  for (const f of flats) {
+  // Flats are independent (each has its own ledger), so bill them in small concurrent batches. One at a time, 41 flats took over a
+  // minute against a database in another region, and 2,400 would take hours.
+  const billOne = (f: (typeof flats)[number]) => {
     const amount = calcMaintenance(f.areaSqft, soc.ratePaisePerSqft)
-    await prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx) => {
       if (await tx.bill.findUnique({ where: { flatId_period: { flatId: f.id, period } } })) return
       await tx.bill.create({
         data: { flatId: f.id, period, areaSqft: f.areaSqft, ratePaise: soc.ratePaisePerSqft, amountPaise: amount, dueDate: dueDateFor(period) },
@@ -68,6 +72,9 @@ export async function billRunPublish(period: string, actor: Actor) {
       created++
       total += amount
     })
+  }
+  for (let i = 0; i < flats.length; i += BILL_RUN_CONCURRENCY) {
+    await Promise.all(flats.slice(i, i + BILL_RUN_CONCURRENCY).map(billOne))
   }
   await writeAudit(prisma, actor, {
     action: 'billing.run.publish', entity: 'BillRun', entityId: period,
