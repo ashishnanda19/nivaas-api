@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Building2, ChevronRight, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
@@ -41,6 +41,15 @@ export default function Login() {
   const [slow, setSlow] = useState(false)
   const [consentMissing, setConsentMissing] = useState(false)
   const consentRef = useRef<HTMLInputElement>(null)
+
+  // Back from the sign-in screen goes to the home page, not out of the site or to whatever was open before.
+  useEffect(() => {
+    const home = () => nav('/', { replace: true })
+    // One extra history entry, so the first Back press is caught here even when the page was opened directly.
+    window.history.pushState(window.history.state, '')
+    window.addEventListener('popstate', home)
+    return () => window.removeEventListener('popstate', home)
+  }, [nav])
 
   useEffect(() => {
     if (wait <= 0) return
@@ -130,12 +139,12 @@ export default function Login() {
     <div className="min-h-dvh bg-sunken">
       <div className="mx-auto flex min-h-dvh max-w-[440px] flex-col gap-6 bg-bg px-5 py-6 md:border-x md:border-line md:px-6 md:py-8">
         <header className="flex items-center justify-between">
-          <span className="flex items-center gap-2.5">
+          <Link to="/" aria-label="Nivaas home" className="flex min-h-[44px] items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-white shadow-sm">
               <Building2 className="h-5 w-5" aria-hidden />
             </span>
             <span className="text-lg font-semibold tracking-tight">Nivaas</span>
-          </span>
+          </Link>
           <LanguageSwitcher />
         </header>
 
@@ -220,7 +229,9 @@ export default function Login() {
               <label
                 className={clsx(
                   'flex cursor-pointer items-start gap-3 rounded-ctl border p-3 text-xs leading-relaxed transition',
-                  consentMissing && !agree ? 'border-danger bg-danger/5 text-fg' : 'border-line bg-sunken text-muted',
+                  consentMissing && !agree
+                    ? 'border-danger bg-danger/5 text-fg'
+                    : 'border-line bg-sunken text-muted',
                 )}
               >
                 <input
