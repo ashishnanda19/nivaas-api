@@ -107,7 +107,7 @@ function CategoryMenu({
           e.stopPropagation()
           setOpen((o) => !o)
         }}
-        className="rounded-full focus-visible:ring-offset-0"
+        className="-my-2 flex min-h-[40px] items-center rounded-full focus-visible:ring-offset-0"
       >
         <Badge tone="accent" className={clsx(!disabled && 'cursor-pointer hover:opacity-80')}>
           {t(`complaints.cats.${c.category}`)}
@@ -128,7 +128,7 @@ function CategoryMenu({
                   if (k !== c.category) onPick(k)
                 }}
                 className={clsx(
-                  'flex min-h-[36px] w-full items-center px-3 text-left text-sm hover:bg-sunken',
+                  'flex min-h-[44px] w-full items-center px-3 text-left text-sm hover:bg-sunken md:min-h-[36px]',
                   k === c.category && 'font-medium text-ink',
                 )}
               >
@@ -501,8 +501,8 @@ export default function Board() {
             {ro ? 'Read-only view for the committee.' : 'Safety complaints are pinned and escalated by rule.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-56">
+        <div className="flex w-full items-center gap-2 md:w-auto">
+          <div className="min-w-0 flex-1 md:w-56 md:flex-none">
             <Input
               label="Search"
               aria-label="Search complaints"
@@ -512,15 +512,17 @@ export default function Board() {
               wrapperClassName="[&>label]:sr-only"
             />
           </div>
-          <Tabs
-            label="View"
-            value={view}
-            onChange={setView}
-            tabs={[
-              { id: 'board', label: 'Board' },
-              { id: 'table', label: 'Table' },
-            ]}
-          />
+          <div className="shrink-0">
+            <Tabs
+              label="View"
+              value={view}
+              onChange={setView}
+              tabs={[
+                { id: 'board', label: 'Board' },
+                { id: 'table', label: 'Table' },
+              ]}
+            />
+          </div>
         </div>
       </div>
       <Async

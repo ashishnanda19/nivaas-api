@@ -28,8 +28,20 @@ export function CollectionChart({ data }: { data: DashboardStats['months'] }) {
           width={64}
         />
         <Tooltip {...tip} formatter={(v: number, n: string) => [inrCompact(v), n]} />
-        <Bar dataKey="billed" name="Billed" fill="rgb(var(--line-strong))" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="collected" name="Collected" fill="rgb(var(--accent))" radius={[4, 4, 0, 0]} />
+        <Bar
+          dataKey="billed"
+          name="Billed"
+          isAnimationActive={false}
+          fill="rgb(var(--line-strong))"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="collected"
+          name="Collected"
+          isAnimationActive={false}
+          fill="rgb(var(--accent))"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -49,7 +61,7 @@ export function SimpleBars({ data, x, y, money }: { data: object[]; x: string; y
           tickFormatter={(v: number) => (money ? inrCompact(v) : String(v))}
         />
         <Tooltip {...tip} formatter={(v: number) => [money ? inrCompact(v) : v, '']} />
-        <Bar dataKey={y} fill="rgb(var(--accent))" radius={[4, 4, 0, 0]} />
+        <Bar dataKey={y} isAnimationActive={false} fill="rgb(var(--accent))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )

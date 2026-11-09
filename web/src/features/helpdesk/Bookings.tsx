@@ -5,7 +5,10 @@ import { fmtDate, inr, isoDay, nextDays } from '@/lib/format'
 import { Async, DataTable, EmptyState, Skeleton, Tabs } from '@/components/ui'
 
 export default function Bookings() {
-  const [view, setView] = useState<'calendar' | 'list'>('calendar')
+  // A seven-column calendar does not fit a phone, so phones start on the list.
+  const [view, setView] = useState<'calendar' | 'list'>(() =>
+    window.matchMedia('(max-width: 767px)').matches ? 'list' : 'calendar',
+  )
   const q = useQuery({ queryKey: ['bookings', 'all'], queryFn: () => api.listBookings() })
   const [days] = useState(() => nextDays(7))
   return (
