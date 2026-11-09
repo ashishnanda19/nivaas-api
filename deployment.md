@@ -189,7 +189,7 @@ node scripts/live-smoke.mjs https://nivaas-api-hazel.vercel.app      # or a loca
 
 The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub throttles scheduled runs (in practice they ran hours apart, not every 10 minutes), so the host does sleep and a cold start is expected: wait a minute and retry. A cold start took 53 seconds when measured on 9 November. For a steadier demo, also point a free external uptime monitor (for example UptimeRobot or cron-job.org, every 5 minutes) at `/health`; GitHub's scheduler cannot guarantee the interval.
 
-The API also guards against a pooled database silently dropping idle connections: connect and pool timeouts are added to `DATABASE_URL` when absent, a failed connection-class query (Prisma P1001, P1002, P1008, P1017, P2024) is retried once, and a `SELECT 1` keeps a connection warm every 4 minutes while the process is awake.
+The API also guards against a pooled database silently dropping idle connections: connect and pool timeouts are added to `DATABASE_URL` when absent, a failed connection-class query (Prisma P1001, P1002, P1008, P1017, P2024) is retried once, and a `SELECT 1` keeps a connection warm every 4 minutes while the process is awake. The HTTP server keeps idle connections open for 65 seconds (Node's default is 5), longer than the 60 second proxies in front of it, so a proxy never reuses a connection that was just closed.
 
 ## File storage
 
