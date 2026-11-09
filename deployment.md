@@ -163,9 +163,27 @@ npm run embeddings:backfill -- --dry-run   # count only; prints the database hos
 npm run embeddings:backfill
 ```
 
+## Verify it yourself
+
+Everything below was run on 9 November 2026; the results are quoted in the Technical Design Document.
+
+```bash
+# API tests need a throwaway Postgres 14+ (any port) and, optionally, Redis. The suite empties every table in DATABASE_URL_TEST.
+DATABASE_URL_TEST=postgresql://nivaas@localhost:5433/nivaas_test REDIS_TEST_URL=redis://localhost:6379 npm test   # 362 pass, 3 skipped (need an S3 server)
+npm run typecheck && npm run test:cov                                                                          # lines 94%, statements 91%
+cd web && npm run lint && npm test && npm run build                                                            # 22 tests
+
+# Evaluations (see the section below). The matching one needs a migrated and seeded database.
+DATABASE_URL=postgresql://nivaas@localhost:5433/nivaas_eval npm run migrate && npm run seed
+DATABASE_URL=... npm run eval:ai && npm run eval:matching && npm run eval:dupes
+
+# Black-box smoke test of a running site, 68 checks (access matrix, validation, safety classification, reports)
+node scripts/live-smoke.mjs https://nivaas-api-hazel.vercel.app      # or a local API, e.g. http://localhost:4000
+```
+
 ## Keeping the live demo awake
 
-The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub may delay scheduled runs, so a cold start is still possible; wait a minute and retry.
+The free API sleeps after about 15 minutes idle and the first request then takes up to a minute. A scheduled GitHub Actions workflow (`.github/workflows/keep-awake.yml`) requests `https://nivaas-api-qazk.onrender.com/health` every 10 minutes to avoid it. GitHub throttles scheduled runs (in practice they ran hours apart, not every 10 minutes), so the host does sleep and a cold start is expected: wait a minute and retry. A cold start took 53 seconds when measured on 9 November.
 
 ## File storage
 
